@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { GeoJsonObject } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import { useFloodStore } from '@/store/useFloodStore';
-import { INUNDATION_DATA, DRAINAGE_DATA, ROUTE_DATA } from '@/data/mockGeoJSON';
+import { getMetroGeoJSON, METRO_CONFIGS } from '@/data/metroFloodData';
 import UserLocationMarker from './UserLocationMarker';
 import EmergencyMarkers from './EmergencyMarkers';
-import HazardMarkers from './HazardMarkers';
 import EvacuationRouteLayer from './EvacuationRouteLayer';
 
 // Fix for default Leaflet icons
@@ -22,7 +21,7 @@ L.Icon.Default.mergeOptions({
 
 function MapUpdater() {
   const map = useMap();
-  const { mapCenterTarget, setMapCenterTarget } = useFloodStore();
+  const { mapCenterTarget, setMapCenterTarget, activeMetro } = useFloodStore();
 
   useEffect(() => {
     setTimeout(() => {
@@ -37,41 +36,63 @@ function MapUpdater() {
     }
   }, [mapCenterTarget, map, setMapCenterTarget]);
 
+  // Center on active metro basin if not explicitly panning
+  useEffect(() => {
+    const config = METRO_CONFIGS[activeMetro];
+    map.flyTo(config.center, config.zoom, { duration: 1.2 });
+  }, [activeMetro, map]);
+
   return null;
 }
 
 const getInundationColor = (depth: number) => {
-  if (depth >= 30) return '#ef4444'; // Red (critical)
-  if (depth >= 10) return '#f59e0b'; // Amber (warning)
-  return '#22c55e'; // Green (safe)
+  if (depth >= 25) return '#dc2626'; // Red (critical: engine stall hazard)
+  if (depth >= 10) return '#f59e0b'; // Amber (warning: low sedan hazard)
+  return '#16a34a'; // Green (safe / clear road)
 };
 
 export default function MapClient() {
-  const { selectedTimeWindow, activeRoute, layerVisibility, setSelectedFeature } = useFloodStore();
+  const {
+    activeMetro,
+    selectedTimeWindow,
+    rainfallIntensity,
+    tidalState,
+    activeRoute,
+    layerVisibility,
+    setSelectedFeature,
+  } = useFloodStore();
 
-  const filteredInundation = {
-    ...INUNDATION_DATA,
-    features: INUNDATION_DATA.features.filter(
-      (f) => f.properties.predictedTimeWindow === selectedTimeWindow
-    ),
-  };
+  // Dynamically compute coupled ML Inundation and Drainage Graph GeoJSON
+  const geoData = useMemo(() => {
+    return getMetroGeoJSON(activeMetro, selectedTimeWindow, rainfallIntensity, tidalState);
+  }, [activeMetro, selectedTimeWindow, rainfallIntensity, tidalState]);
 
-  const getDrainageIcon = (status: string) => {
+  const getDrainageIcon = (status: string, backflow: number) => {
     const isSurcharging = status === 'surcharging';
     return L.divIcon({
       className: 'bg-transparent',
-      html: `<div class="w-4 h-4 rounded-full border-2 border-white shadow-md ${
-        isSurcharging ? 'bg-red-600 animate-pulse' : status === 'congested' ? 'bg-amber-500' : 'bg-blue-500'
-      }"></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
+      html: `<div class="relative flex items-center justify-center">
+        <div class="w-4 h-4 rounded-full border-2 border-white shadow-md ${
+          isSurcharging ? 'bg-red-600 animate-ping' : status === 'congested' ? 'bg-amber-500' : 'bg-blue-600'
+        }"></div>
+        <div class="absolute w-3.5 h-3.5 rounded-full border-2 border-white ${
+          isSurcharging ? 'bg-red-600' : status === 'congested' ? 'bg-amber-500' : 'bg-blue-600'
+        }"></div>
+        ${
+          backflow > 0
+            ? '<span class="absolute -top-3 text-[9px] font-black bg-red-600 text-white px-1 rounded-full shadow-sm">▲ backflow</span>'
+            : ''
+        }
+      </div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
     });
   };
 
   return (
     <MapContainer
-      center={[19.0596, 72.8626]}
-      zoom={14}
+      center={METRO_CONFIGS[activeMetro].center}
+      zoom={METRO_CONFIGS[activeMetro].zoom}
       className="h-full w-full z-0"
       zoomControl={false}
     >
@@ -79,79 +100,109 @@ export default function MapClient() {
         attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
         url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
       />
-      
-      {/* Existing street inundation layer (preserved) */}
+
+      {/* 1. Underground Drainage Pipes (Directed Graph Edges) */}
+      {layerVisibility.drainage && (
+        <GeoJSON
+          key={`pipes-${activeMetro}-${rainfallIntensity}`}
+          data={geoData.drainagePipes as unknown as GeoJsonObject}
+          style={(feature) => ({
+            color: feature?.properties?.isChoked ? '#dc2626' : '#2563eb',
+            weight: 3,
+            opacity: 0.6,
+            dashArray: '4, 4',
+          })}
+        />
+      )}
+
+      {/* 2. Street Inundation Depth Segments (Coupled ML Model Output) */}
       {layerVisibility.streets && (
         <GeoJSON
-          key={`inundation-${selectedTimeWindow}`}
-          data={filteredInundation as GeoJsonObject}
+          key={`inundation-${activeMetro}-${selectedTimeWindow}-${rainfallIntensity}-${tidalState}`}
+          data={geoData.inundation as unknown as GeoJsonObject}
           style={(feature) => ({
             color: getInundationColor(feature?.properties?.waterDepthCm || 0),
-            weight: 6,
-            opacity: 0.8,
+            weight: 7,
+            opacity: 0.85,
           })}
           onEachFeature={(feature, layer) => {
             layer.on({
               click: () => setSelectedFeature({ type: 'street', data: feature.properties }),
             });
+            // Tooltip on hover showing live water depth
+            layer.bindTooltip(
+              `<strong>${feature.properties.streetName}</strong><br/>Depth: <b>${feature.properties.waterDepthCm} cm</b> (${feature.properties.riskLevel.toUpperCase()})<br/>DEM: ${feature.properties.elevationM}m MSL`,
+              { sticky: true, opacity: 0.9 }
+            );
           }}
         />
       )}
 
-      {/* Existing drainage network layer (preserved) */}
+      {/* 3. Underground Drainage Graph Nodes (Inlets / Surcharging Manholes) */}
       {layerVisibility.drainage && (
         <GeoJSON
-          key="drainage"
-          data={DRAINAGE_DATA as GeoJsonObject}
+          key={`nodes-${activeMetro}-${rainfallIntensity}-${tidalState}`}
+          data={geoData.drainageNodes as unknown as GeoJsonObject}
           pointToLayer={(feature, latlng) => {
-            return L.marker(latlng, { icon: getDrainageIcon(feature.properties.status) });
+            return L.marker(latlng, {
+              icon: getDrainageIcon(feature.properties.status, feature.properties.backflowLps),
+            });
           }}
           onEachFeature={(feature, layer) => {
             layer.on({
               click: () => setSelectedFeature({ type: 'drain', data: feature.properties }),
             });
+            layer.bindTooltip(
+              `<strong>${feature.properties.nodeName}</strong><br/>Status: <b>${feature.properties.status.toUpperCase()}</b> (${feature.properties.capacityUtilization}%)<br/>Backflow: ${feature.properties.backflowLps} L/s`,
+              { sticky: true, opacity: 0.9 }
+            );
           }}
         />
       )}
 
-      {/* Existing primary route (preserved) */}
+      {/* 4. Primary Route (Potentially Flooded Corridor) */}
       {(activeRoute === 'primary' || activeRoute === 'both') && (
         <GeoJSON
-          key="route-primary"
-          data={ROUTE_DATA.features.filter((f) => f.properties.type === 'primary') as unknown as GeoJsonObject}
+          key={`route-primary-${activeMetro}-${rainfallIntensity}`}
+          data={
+            geoData.routes.features.filter(
+              (f) => f.properties.type === 'primary'
+            ) as unknown as GeoJsonObject
+          }
           style={() => ({
             color: '#ef4444',
             weight: 8,
-            opacity: 0.4,
+            opacity: 0.45,
             dashArray: '10, 10',
           })}
         />
       )}
 
-      {/* Existing alternate route (preserved) */}
+      {/* 5. Alternate Route (Recommended Flood-Safe Corridor) */}
       {(activeRoute === 'alternate' || activeRoute === 'both') && (
         <GeoJSON
-          key="route-alternate"
-          data={ROUTE_DATA.features.filter((f) => f.properties.type === 'alternate') as unknown as GeoJsonObject}
+          key={`route-alternate-${activeMetro}-${rainfallIntensity}`}
+          data={
+            geoData.routes.features.filter(
+              (f) => f.properties.type === 'alternate'
+            ) as unknown as GeoJsonObject
+          }
           style={() => ({
-            color: '#22c55e',
+            color: '#16a34a',
             weight: 6,
-            opacity: 0.9,
-            dashArray: '15, 10',
+            opacity: 0.95,
+            dashArray: '12, 8',
           })}
         />
       )}
 
-      {/* Multi-Disaster Hazard Layers (New) */}
-      <HazardMarkers />
-
-      {/* Nearby Emergency Service Markers: 🏥, 👮, 🚒, 🏠 (New) */}
+      {/* 6. Nearby Flood Relief & Emergency Markers: 🏥, 👮, 🚒, 🏠 */}
       <EmergencyMarkers />
 
-      {/* Active Evacuation Route Navigation Layer (New) */}
+      {/* 7. Active Evacuation Route Navigation Layer */}
       <EvacuationRouteLayer />
 
-      {/* User GPS Location Marker: 📍 YOU ARE HERE (New) */}
+      {/* 8. User GPS Location Marker: 📍 YOU ARE HERE */}
       <UserLocationMarker />
 
       <MapUpdater />

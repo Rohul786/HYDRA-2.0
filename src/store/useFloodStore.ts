@@ -1,43 +1,57 @@
 import { create } from 'zustand';
 import {
   SelectedEntity,
-  HazardType,
-  HazardItem,
+  LeadTimeWindow,
+  MetroCity,
+  TidalState,
   EmergencyService,
   NearbyEmergencyServices,
   UserLocationState,
   UserSafetyStatus,
+  InundationProperties,
 } from '../types';
-import { MOCK_HAZARDS } from '@/data/mockHazards';
 import { calculateHaversineDistance, formatDistance, calculateEstimatedTravelTime } from '@/utils/geoDistance';
-import { DEFAULT_MOCK_SERVICES } from '@/data/mockEmergencyServices';
-import { PRE_SEEDED_GLOBAL_HAZARDS } from '@/utils/globalHazards';
+import { METRO_CONFIGS, METRO_DATASETS, getMetroGeoJSON } from '@/data/metroFloodData';
 
-export type ExtendedLayerKey = 'streets' | 'drainage' | 'hospitals' | 'police' | 'fire' | 'shelters';
-
-const INITIAL_SERVICES = DEFAULT_MOCK_SERVICES.map((s) => {
-  const dist = calculateHaversineDistance(19.0596, 72.8626, s.latitude, s.longitude);
-  return {
-    ...s,
-    distanceMeters: dist,
-    distanceFormatted: formatDistance(dist),
-    travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
-  };
-});
+export type ExtendedLayerKey =
+  | 'streets'
+  | 'drainage'
+  | 'hospitals'
+  | 'police'
+  | 'fire'
+  | 'shelters'
+  | 'routes';
 
 export interface WeatherSummary {
   temp: number;
   precipitation: number;
   windSpeed: number;
   condition: string;
+  radarReflectivityDbz: number;
   alert?: string;
 }
 
 interface FloodState {
-  // Existing state preserved 100%
-  selectedTimeWindow: '0h' | '1h' | '2h' | '3h';
+  // Metro Selection
+  activeMetro: MetroCity;
+  setActiveMetro: (metro: MetroCity) => void;
+
+  // Real-time Doppler Radar & Hydraulic Parameters
+  rainfallIntensity: number; // mm/hr (0 - 120)
+  setRainfallIntensity: (intensity: number) => void;
+
+  tidalState: TidalState;
+  setTidalState: (state: TidalState) => void;
+
+  selectedTimeWindow: LeadTimeWindow;
+  setTimeWindow: (window: LeadTimeWindow) => void;
+
   activeRoute: 'primary' | 'alternate' | 'both';
+  setActiveRoute: (route: 'primary' | 'alternate' | 'both') => void;
+
   selectedFeature: SelectedEntity;
+  setSelectedFeature: (feature: SelectedEntity) => void;
+
   layerVisibility: {
     streets: boolean;
     drainage: boolean;
@@ -45,223 +59,255 @@ interface FloodState {
     police: boolean;
     fire: boolean;
     shelters: boolean;
-    hazards: Record<HazardType, boolean>;
+    routes: boolean;
   };
-  setTimeWindow: (window: '0h' | '1h' | '2h' | '3h') => void;
-  setActiveRoute: (route: 'primary' | 'alternate' | 'both') => void;
-  setSelectedFeature: (feature: SelectedEntity) => void;
   toggleLayerVisibility: (layer: ExtendedLayerKey) => void;
-  toggleHazardLayer: (hazard: HazardType) => void;
 
   // Geolocation State
   userLocation: UserLocationState;
   setUserLocation: (location: Partial<UserLocationState>) => void;
 
-  // Nearby Emergency Services
+  // Nearby Emergency Services (Shelters & Rescue)
   nearbyServices: NearbyEmergencyServices;
   setNearbyServices: (services: Partial<NearbyEmergencyServices>) => void;
 
-  // Active Emergency Navigation & Route
+  // Active Emergency Navigation
   activeNavigationDestination: EmergencyService | null;
   setActiveNavigationDestination: (dest: EmergencyService | null) => void;
 
-  // Multi-Disaster Hazard State
-  selectedHazard: HazardItem | null;
-  setSelectedHazard: (hazard: HazardItem | null) => void;
-
-  // Global Multi-Disaster Hazards (USGS + Global Meteorological feeds)
-  globalHazards: HazardItem[];
-  setGlobalHazards: (hazards: HazardItem[]) => void;
-  addGlobalHazards: (newHazards: HazardItem[]) => void;
-
-  // Dynamic Weather
+  // Doppler Weather Summary
   currentWeather: WeatherSummary;
   setCurrentWeather: (w: WeatherSummary) => void;
 
-  // Active Place Searched (Worldwide)
-  activePlaceName: string;
-  setActivePlaceName: (name: string) => void;
-
-  // Live Safety Status
+  // Live Location-Aware Flood Safety Status
   safetyStatus: UserSafetyStatus;
   evaluateSafetyStatus: (lat: number, lng: number) => void;
 
-  // Map center target for smooth panning
+  // Map panning target [lat, lng]
   mapCenterTarget: [number, number] | null;
   setMapCenterTarget: (target: [number, number] | null) => void;
 }
 
-export const useFloodStore = create<FloodState>((set, get) => ({
-  selectedTimeWindow: '0h',
-  activeRoute: 'both',
-  selectedFeature: null,
-  layerVisibility: {
-    streets: true,
-    drainage: true,
-    hospitals: true,
-    police: true,
-    fire: true,
-    shelters: true,
-    hazards: {
-      flood: true,
-      cyclone: true,
-      earthquake: true,
-      landslide: true,
-      wildfire: true,
-      tsunami: true,
-      severe_storm: true,
-      extreme_rainfall: true,
-      heatwave: true,
-    },
-  },
-  setTimeWindow: (window) => set({ selectedTimeWindow: window }),
-  setActiveRoute: (route) => set({ activeRoute: route }),
-  setSelectedFeature: (feature) => set({ selectedFeature: feature }),
-
-  toggleLayerVisibility: (layer) =>
-    set((state) => ({
-      layerVisibility: {
-        ...state.layerVisibility,
-        [layer]: !state.layerVisibility[layer],
-      },
-    })),
-
-  toggleHazardLayer: (hazard) =>
-    set((state) => ({
-      layerVisibility: {
-        ...state.layerVisibility,
-        hazards: {
-          ...state.layerVisibility.hazards,
-          [hazard]: !state.layerVisibility.hazards[hazard],
-        },
-      },
-    })),
-
-  // Geolocation state
-  userLocation: {
-    latitude: 19.0596, // Default demo coordinates (BKC Mumbai)
-    longitude: 72.8626,
-    accuracy: null,
-    loading: false,
-    error: null,
-    permissionState: 'prompt',
-    isRealGps: false,
-  },
-  setUserLocation: (updates) =>
-    set((state) => ({
-      userLocation: {
-        ...state.userLocation,
-        ...updates,
-      },
-    })),
-
-  // Emergency Services state
-  nearbyServices: {
-    hospitals: INITIAL_SERVICES.filter((s) => s.type === 'hospital').sort((a, b) => a.distanceMeters - b.distanceMeters),
-    policeStations: INITIAL_SERVICES.filter((s) => s.type === 'police').sort((a, b) => a.distanceMeters - b.distanceMeters),
-    fireStations: INITIAL_SERVICES.filter((s) => s.type === 'fire_station').sort((a, b) => a.distanceMeters - b.distanceMeters),
-    shelters: INITIAL_SERVICES.filter((s) => s.type === 'shelter').sort((a, b) => a.distanceMeters - b.distanceMeters),
-    loading: false,
-    error: null,
-  },
-  setNearbyServices: (updates) =>
-    set((state) => ({
-      nearbyServices: {
-        ...state.nearbyServices,
-        ...updates,
-      },
-    })),
-
-  // Active navigation
-  activeNavigationDestination: null,
-  setActiveNavigationDestination: (dest) => set({ activeNavigationDestination: dest }),
-
-  // Selected hazard modal
-  selectedHazard: null,
-  setSelectedHazard: (hazard) => set({ selectedHazard: hazard }),
-
-  // Global hazards feed
-  globalHazards: PRE_SEEDED_GLOBAL_HAZARDS,
-  setGlobalHazards: (hazards) => set({ globalHazards: hazards }),
-  addGlobalHazards: (newHazards) =>
-    set((state) => {
-      const existingIds = new Set(state.globalHazards.map((h) => h.id));
-      const filtered = newHazards.filter((h) => !existingIds.has(h.id));
-      return { globalHazards: [...state.globalHazards, ...filtered] };
-    }),
-
-  // Live weather
-  currentWeather: {
-    temp: 28,
-    precipitation: 42,
-    windSpeed: 14,
-    condition: 'Heavy Rain',
-    alert: 'Critical Alert: Backflow detected at BKC Drainage Node 1',
-  },
-  setCurrentWeather: (currentWeather) => set({ currentWeather }),
-
-  // Active searched place
-  activePlaceName: 'Bandra Kurla Complex, Mumbai',
-  setActivePlaceName: (activePlaceName) => set({ activePlaceName }),
-
-  // Safety status for active coordinates
-  safetyStatus: {
-    level: 'danger',
-    title: 'DANGER',
-    message: 'High disaster risk detected near you.',
-    hazardCount: 1,
-    primaryHazard: MOCK_HAZARDS[0],
-  },
-
-  evaluateSafetyStatus: (lat: number, lng: number) => {
-    const allKnownHazards = [...MOCK_HAZARDS, ...get().globalHazards];
-
-    // Check intersection with all active hazards
-    const intersectingHazards = allKnownHazards.filter((hazard) => {
-      const dist = calculateHaversineDistance(lat, lng, hazard.latitude, hazard.longitude);
-      return dist <= hazard.radius;
-    });
-
-    if (intersectingHazards.length === 0) {
-      set({
-        safetyStatus: {
-          level: 'safe',
-          title: 'SAFE',
-          message: 'No major disaster detected near you.',
-          hazardCount: 0,
-        },
-      });
-      return;
-    }
-
-    const hasDanger = intersectingHazards.some(
-      (h) => h.severity === 'critical' || h.severity === 'high'
+export const useFloodStore = create<FloodState>((set, get) => {
+  const initialMetro: MetroCity = 'mumbai';
+  const initialServices = METRO_DATASETS[initialMetro].emergencyServices.map((s) => {
+    const dist = calculateHaversineDistance(
+      METRO_CONFIGS[initialMetro].center[0],
+      METRO_CONFIGS[initialMetro].center[1],
+      s.latitude,
+      s.longitude
     );
-    const primary = intersectingHazards[0];
+    return {
+      ...s,
+      distanceMeters: dist,
+      distanceFormatted: formatDistance(dist),
+      travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+    };
+  });
 
-    if (hasDanger) {
+  return {
+    activeMetro: initialMetro,
+    setActiveMetro: (metro) => {
+      const config = METRO_CONFIGS[metro];
+      const metroServices = METRO_DATASETS[metro].emergencyServices.map((s) => {
+        const dist = calculateHaversineDistance(config.center[0], config.center[1], s.latitude, s.longitude);
+        return {
+          ...s,
+          distanceMeters: dist,
+          distanceFormatted: formatDistance(dist),
+          travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+        };
+      });
+
       set({
-        safetyStatus: {
-          level: 'danger',
-          title: 'DANGER',
-          message: 'High disaster risk detected near you.',
-          hazardCount: intersectingHazards.length,
-          primaryHazard: primary,
+        activeMetro: metro,
+        mapCenterTarget: config.center,
+        selectedFeature: null,
+        activeNavigationDestination: null,
+        nearbyServices: {
+          hospitals: metroServices.filter((s) => s.type === 'hospital').sort((a, b) => a.distanceMeters - b.distanceMeters),
+          policeStations: metroServices.filter((s) => s.type === 'police').sort((a, b) => a.distanceMeters - b.distanceMeters),
+          fireStations: metroServices.filter((s) => s.type === 'fire_station').sort((a, b) => a.distanceMeters - b.distanceMeters),
+          shelters: metroServices.filter((s) => s.type === 'shelter').sort((a, b) => a.distanceMeters - b.distanceMeters),
+          loading: false,
+          error: null,
         },
       });
-    } else {
-      set({
-        safetyStatus: {
-          level: 'warning',
-          title: 'BE CAREFUL',
-          message: 'Moderate disaster risk detected nearby.',
-          hazardCount: intersectingHazards.length,
-          primaryHazard: primary,
-        },
-      });
-    }
-  },
 
-  mapCenterTarget: null,
-  setMapCenterTarget: (target) => set({ mapCenterTarget: target }),
-}));
+      get().evaluateSafetyStatus(config.center[0], config.center[1]);
+    },
+
+    rainfallIntensity: 45, // 45 mm/hr Heavy monsoonal rain
+    setRainfallIntensity: (intensity) => {
+      set({ rainfallIntensity: intensity });
+      const { userLocation } = get();
+      if (userLocation.latitude && userLocation.longitude) {
+        get().evaluateSafetyStatus(userLocation.latitude, userLocation.longitude);
+      }
+    },
+
+    tidalState: 'normal',
+    setTidalState: (tidalState) => set({ tidalState }),
+
+    selectedTimeWindow: '0h',
+    setTimeWindow: (selectedTimeWindow) => {
+      set({ selectedTimeWindow });
+      const { userLocation } = get();
+      if (userLocation.latitude && userLocation.longitude) {
+        get().evaluateSafetyStatus(userLocation.latitude, userLocation.longitude);
+      }
+    },
+
+    activeRoute: 'both',
+    setActiveRoute: (activeRoute) => set({ activeRoute }),
+
+    selectedFeature: null,
+    setSelectedFeature: (selectedFeature) => set({ selectedFeature }),
+
+    layerVisibility: {
+      streets: true,
+      drainage: true,
+      hospitals: true,
+      police: true,
+      fire: true,
+      shelters: true,
+      routes: true,
+    },
+    toggleLayerVisibility: (layer) =>
+      set((state) => ({
+        layerVisibility: {
+          ...state.layerVisibility,
+          [layer]: !state.layerVisibility[layer],
+        },
+      })),
+
+    userLocation: {
+      latitude: 19.0626, // Default BKC Mumbai
+      longitude: 72.8626,
+      accuracy: null,
+      loading: false,
+      error: null,
+      permissionState: 'prompt',
+      isRealGps: false,
+    },
+    setUserLocation: (updates) =>
+      set((state) => ({
+        userLocation: {
+          ...state.userLocation,
+          ...updates,
+        },
+      })),
+
+    nearbyServices: {
+      hospitals: initialServices.filter((s) => s.type === 'hospital').sort((a, b) => a.distanceMeters - b.distanceMeters),
+      policeStations: initialServices.filter((s) => s.type === 'police').sort((a, b) => a.distanceMeters - b.distanceMeters),
+      fireStations: initialServices.filter((s) => s.type === 'fire_station').sort((a, b) => a.distanceMeters - b.distanceMeters),
+      shelters: initialServices.filter((s) => s.type === 'shelter').sort((a, b) => a.distanceMeters - b.distanceMeters),
+      loading: false,
+      error: null,
+    },
+    setNearbyServices: (updates) =>
+      set((state) => ({
+        nearbyServices: {
+          ...state.nearbyServices,
+          ...updates,
+        },
+      })),
+
+    activeNavigationDestination: null,
+    setActiveNavigationDestination: (activeNavigationDestination) =>
+      set({ activeNavigationDestination }),
+
+    currentWeather: {
+      temp: 28,
+      precipitation: 45,
+      windSpeed: 16,
+      radarReflectivityDbz: 48,
+      condition: 'Heavy Monsoonal Rain',
+      alert: 'Doppler Warning: Rapid street inundation (+45cm) forecast in low micro-DEM zones',
+    },
+    setCurrentWeather: (currentWeather) => set({ currentWeather }),
+
+    safetyStatus: {
+      level: 'danger',
+      title: 'DANGER',
+      message: 'Severe street inundation (+45 cm) detected near your location.',
+      waterDepthCm: 45,
+      activeNowcastHorizon: '0h',
+      nearestHotspot: 'BKC Road (Diamond Bourse Section)',
+    },
+
+    evaluateSafetyStatus: (lat: number, lng: number) => {
+      const { activeMetro, selectedTimeWindow, rainfallIntensity, tidalState } = get();
+      const geo = getMetroGeoJSON(activeMetro, selectedTimeWindow, rainfallIntensity, tidalState);
+
+      // Find nearest street inundation
+      let nearestStreet: InundationProperties | null = null;
+      let minDistance = Infinity;
+
+      geo.inundation.features.forEach((feat) => {
+        const coords = feat.geometry.coordinates;
+        // Check midpoint distance
+        const midIdx = Math.floor(coords.length / 2);
+        const [sLng, sLat] = coords[midIdx];
+        const dist = calculateHaversineDistance(lat, lng, sLat, sLng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestStreet = feat.properties;
+        }
+      });
+
+      if (!nearestStreet || minDistance > 1500) {
+        set({
+          safetyStatus: {
+            level: 'safe',
+            title: 'SAFE',
+            message: 'No immediate street flooding detected near your coordinates.',
+            waterDepthCm: 0,
+            activeNowcastHorizon: selectedTimeWindow,
+          },
+        });
+        return;
+      }
+
+      const street = nearestStreet as InundationProperties;
+      if (street.waterDepthCm >= 25) {
+        set({
+          safetyStatus: {
+            level: 'danger',
+            title: 'CRITICAL INUNDATION',
+            message: `${street.streetName} submerged under ${street.waterDepthCm} cm water. Avoid road travel.`,
+            waterDepthCm: street.waterDepthCm,
+            activeNowcastHorizon: selectedTimeWindow,
+            nearestHotspot: street.streetName,
+          },
+        });
+      } else if (street.waterDepthCm >= 10) {
+        set({
+          safetyStatus: {
+            level: 'warning',
+            title: 'WATERLOGGING CAUTION',
+            message: `Moderate waterlogging (${street.waterDepthCm} cm) on ${street.streetName}. Two-wheelers use caution.`,
+            waterDepthCm: street.waterDepthCm,
+            activeNowcastHorizon: selectedTimeWindow,
+            nearestHotspot: street.streetName,
+          },
+        });
+      } else {
+        set({
+          safetyStatus: {
+            level: 'safe',
+            title: 'CLEAR CORRIDOR',
+            message: `Road surface passable (${street.waterDepthCm} cm depth) on ${street.streetName}.`,
+            waterDepthCm: street.waterDepthCm,
+            activeNowcastHorizon: selectedTimeWindow,
+            nearestHotspot: street.streetName,
+          },
+        });
+      }
+    },
+
+    mapCenterTarget: null,
+    setMapCenterTarget: (mapCenterTarget) => set({ mapCenterTarget }),
+  };
+});

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   MapPin,
   Info,
+  Droplets,
 } from 'lucide-react';
 
 export default function LocationSafetyCard() {
@@ -24,7 +25,7 @@ export default function LocationSafetyCard() {
     requestLocation,
   } = useUserLocation();
 
-  const { safetyStatus } = useFloodStore();
+  const { safetyStatus, activeMetro } = useFloodStore();
 
   const getSafetyBadge = () => {
     switch (safetyStatus.level) {
@@ -34,8 +35,8 @@ export default function LocationSafetyCard() {
           bg: 'bg-red-50 border-red-200',
           textColor: 'text-red-900',
           badgeBg: 'bg-red-600 text-white',
-          title: 'DANGER',
-          message: safetyStatus.message || 'High disaster risk detected near you.',
+          title: safetyStatus.title || 'CRITICAL FLOOD',
+          message: safetyStatus.message,
         };
       case 'warning':
         return {
@@ -43,8 +44,8 @@ export default function LocationSafetyCard() {
           bg: 'bg-amber-50 border-amber-200',
           textColor: 'text-amber-900',
           badgeBg: 'bg-amber-500 text-white',
-          title: 'BE CAREFUL',
-          message: safetyStatus.message || 'Moderate disaster risk detected nearby.',
+          title: safetyStatus.title || 'CAUTION',
+          message: safetyStatus.message,
         };
       case 'safe':
       default:
@@ -53,8 +54,8 @@ export default function LocationSafetyCard() {
           bg: 'bg-emerald-50 border-emerald-200',
           textColor: 'text-emerald-900',
           badgeBg: 'bg-emerald-600 text-white',
-          title: 'SAFE',
-          message: safetyStatus.message || 'No major disaster detected near you.',
+          title: safetyStatus.title || 'SAFE',
+          message: safetyStatus.message,
         };
     }
   };
@@ -68,7 +69,7 @@ export default function LocationSafetyCard() {
         <div className="flex items-center gap-2">
           <MapPin className={`w-4 h-4 ${isRealGps ? 'text-blue-600' : 'text-gray-400'}`} />
           <span className="text-xs font-semibold text-gray-700">
-            {isRealGps ? 'Using your location' : 'Demo location (BKC)'}
+            {isRealGps ? 'Live GPS Location' : `${activeMetro.toUpperCase()} Metro Hub`}
           </span>
         </div>
 
@@ -86,7 +87,7 @@ export default function LocationSafetyCard() {
           ) : (
             <>
               <Crosshair className="w-3.5 h-3.5" />
-              <span>{isRealGps ? 'Refresh' : 'Use My Location'}</span>
+              <span>{isRealGps ? 'Refresh GPS' : 'Locate Me'}</span>
             </>
           )}
         </button>
@@ -98,7 +99,7 @@ export default function LocationSafetyCard() {
           <span>
             {latitude.toFixed(4)}°N, {longitude.toFixed(4)}°E
           </span>
-          {accuracy ? <span>±{Math.round(accuracy)}m</span> : <span>BKC Hub</span>}
+          {accuracy ? <span>±{Math.round(accuracy)}m</span> : <span>Verified Hub</span>}
         </div>
       )}
 
@@ -119,19 +120,20 @@ export default function LocationSafetyCard() {
         </div>
       )}
 
-      {/* User Safety Status Badge */}
+      {/* User Flood Safety Status Badge */}
       <div className={`p-3 rounded-xl border flex items-start gap-2.5 ${badge.bg}`}>
         {badge.icon}
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2 mb-0.5">
+        <div className="flex flex-col flex-1">
+          <div className="flex items-center justify-between mb-1">
             <span
               className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded shadow-sm tracking-wide ${badge.badgeBg}`}
             >
               {badge.title}
             </span>
-            {safetyStatus.hazardCount > 0 && (
-              <span className="text-[11px] text-gray-600 font-medium">
-                ({safetyStatus.hazardCount} nearby risk zone{safetyStatus.hazardCount > 1 ? 's' : ''})
+            {safetyStatus.waterDepthCm > 0 && (
+              <span className="text-[11px] font-bold text-gray-700 flex items-center gap-1">
+                <Droplets className="w-3 h-3 text-blue-600" />
+                {safetyStatus.waterDepthCm} cm depth
               </span>
             )}
           </div>

@@ -1,22 +1,60 @@
 import { Feature, LineString, Polygon, Point } from 'geojson';
 
+export type LeadTimeWindow = '0h' | '1h' | '2h' | '3h';
+
 export interface InundationProperties {
   segmentId: string;
   streetName: string;
   waterDepthCm: number;
   riskLevel: 'safe' | 'warning' | 'critical';
-  predictedTimeWindow: '0h' | '1h' | '2h' | '3h';
+  predictedTimeWindow: LeadTimeWindow;
+  // Micro-topography & DEM
+  elevationM: number;
+  slopePct: number;
+  imperviousnessPct: number; // Concrete / asphalt fraction (e.g. 90%)
+  catchmentAreaHa: number;
+  // Hydraulic coupling
+  runoffLps?: number;
+  nearestDrainNodeId?: string;
+  drainBackflowLps?: number;
+  flowVelocityMs?: number;
+  timeToPeakMins?: number;
 }
 
 export type InundationFeature = Feature<LineString | Polygon, InundationProperties>;
 
+export type DrainageNodeType = 'inlet' | 'manhole' | 'outfall' | 'pumping_station';
+
 export interface DrainageNodeProperties {
   nodeId: string;
+  nodeName: string;
+  type: DrainageNodeType;
+  groundElevationM: number;
+  invertElevationM: number;
+  designCapacityLps: number;
+  inflowLps: number;
+  capacityUtilization: number; // percentage (0 - 200%)
   status: 'normal' | 'congested' | 'surcharging';
-  capacityUtilization: number;
+  backflowLps: number; // Volume spilling back onto streets
+  depthToWaterM?: number;
 }
 
-export type DrainageNodeFeature = Feature<Point | LineString, DrainageNodeProperties>;
+export type DrainageNodeFeature = Feature<Point, DrainageNodeProperties>;
+
+export interface DrainagePipeProperties {
+  pipeId: string;
+  fromNode: string;
+  toNode: string;
+  diameterMm: number;
+  lengthM: number;
+  slopePct: number;
+  hydraulicCapacityLps: number;
+  currentFlowLps: number;
+  utilizationPct: number;
+  isChoked: boolean;
+}
+
+export type DrainagePipeFeature = Feature<LineString, DrainagePipeProperties>;
 
 export interface RouteProperties {
   type: 'primary' | 'alternate';
@@ -24,39 +62,31 @@ export interface RouteProperties {
   distanceKm: number;
   estimatedTimeMins: number;
   message: string;
+  maxFloodDepthCm?: number;
+  elevationGainM?: number;
 }
 
 export type RouteFeature = Feature<LineString, RouteProperties>;
 
-// Multi-Disaster Hazard Model
-export type HazardType =
-  | 'flood'
-  | 'cyclone'
-  | 'earthquake'
-  | 'landslide'
-  | 'wildfire'
-  | 'tsunami'
-  | 'severe_storm'
-  | 'extreme_rainfall'
-  | 'heatwave';
+// Major Indian Metro Basins
+export type MetroCity = 'mumbai' | 'delhi' | 'chennai';
 
-export type HazardSeverity = 'low' | 'moderate' | 'high' | 'critical';
-
-export interface HazardItem {
-  id: string;
-  type: HazardType;
+export interface MetroBasinConfig {
+  id: MetroCity;
   name: string;
-  severity: HazardSeverity;
-  riskScore: number; // 0-100
-  latitude: number;
-  longitude: number;
-  radius: number; // in meters (radius of impact zone)
-  timestamp: string;
+  basinName: string;
+  state: string;
+  center: [number, number]; // [lat, lng]
+  zoom: number;
+  demRangeM: [number, number]; // [min, max]
+  radarStation: string;
+  primaryOutfall: string;
   description: string;
-  recommendedAction: string;
 }
 
-// Emergency Services Model
+export type TidalState = 'low_tide' | 'normal' | 'high_tide';
+
+// Emergency Services Model (Preserved for Flood Evacuation)
 export type EmergencyServiceType = 'hospital' | 'police' | 'fire_station' | 'shelter';
 
 export interface EmergencyService {
@@ -70,7 +100,7 @@ export interface EmergencyService {
   travelTimeMins?: number;
   address?: string;
   phone?: string;
-  capacity?: number; // strictly only if real data or explicit mock
+  capacity?: number;
   isDemoFallback?: boolean;
 }
 
@@ -95,20 +125,20 @@ export interface UserLocationState {
   isRealGps: boolean;
 }
 
-// User Safety Status
+// Flood Safety Status
 export type SafetyLevel = 'safe' | 'warning' | 'danger';
 
 export interface UserSafetyStatus {
   level: SafetyLevel;
   title: string;
   message: string;
-  hazardCount: number;
-  primaryHazard?: HazardItem;
+  waterDepthCm: number;
+  activeNowcastHorizon: LeadTimeWindow;
+  nearestHotspot?: string;
 }
 
-export type SelectedEntity = 
+export type SelectedEntity =
   | { type: 'street'; data: InundationProperties }
   | { type: 'drain'; data: DrainageNodeProperties }
-  | { type: 'hazard'; data: HazardItem }
   | { type: 'emergency'; data: EmergencyService }
   | null;

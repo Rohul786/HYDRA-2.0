@@ -5,41 +5,39 @@ import LocationSafetyCard from '@/components/ui/LocationSafetyCard';
 import EmergencyServicesPanel from '@/components/ui/EmergencyServicesPanel';
 import RouteInspector from '@/components/ui/RouteInspector';
 import InspectorModal from '@/components/ui/InspectorModal';
-import HazardDetailModal from '@/components/ui/HazardDetailModal';
-import GlobalSearchTicker from '@/components/ui/GlobalSearchTicker';
+import MetroRadarBar from '@/components/ui/MetroRadarBar';
 
 export default function Home() {
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-gray-50 font-sans">
-      {/* Interactive Map (Preserved & Extended with GPS, Services, Hazards, Navigation) */}
+      {/* Interactive Map (Coupled ML Inundation, Drainage Network Graph, Evacuation Routing) */}
       <FloodMap />
 
-      {/* Worldwide Place Search & Live Global Alert Ticker */}
-      <GlobalSearchTicker />
+      {/* Top Center: Indian Metro Basins & Live Doppler Radar Nowcast Controller */}
+      <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 w-full max-w-4xl px-4 flex justify-center pointer-events-auto">
+        <MetroRadarBar />
+      </div>
 
-      {/* Left Control Column: Branding, Weather, Safety, Emergency Services */}
+      {/* Left Control Column: Branding, Live Weather, GPS Flood Safety, Nearby Evacuation Hubs */}
       <div className="absolute top-6 left-6 z-10 flex flex-col gap-3.5 max-h-[calc(100vh-48px)] overflow-y-auto pr-1">
-        {/* App Title & Subtitle Branding */}
+        {/* App Title & Subtitle Branding with Circular Multi-Disaster Logo */}
         <HeaderBranding />
 
-        {/* Environmental Live Conditions (Preserved & Reactive to Location) */}
+        {/* Environmental & Doppler Radar Conditions */}
         <WeatherPill />
 
-        {/* User GPS Geolocation & Live Safety Assessment */}
+        {/* User GPS Geolocation & Live Street Flood Safety Assessment */}
         <LocationSafetyCard />
 
-        {/* Nearby Emergency Services Panel */}
+        {/* Nearby Emergency Shelters & Flood Relief Facilities */}
         <EmergencyServicesPanel />
       </div>
 
-      {/* Forecasting Nowcast, Map Layers, Route Navigation (Preserved & Extended) */}
+      {/* Predictive Nowcast Horizon, Hydraulic Layers & Flood-Safe Navigation */}
       <RouteInspector />
 
-      {/* Inundation & Drainage Inspection Modal (Preserved) */}
+      {/* Coupled ML Inundation & Drainage Surcharge Inspector */}
       <InspectorModal />
-
-      {/* Multi-Disaster Hazard Detail Modal */}
-      <HazardDetailModal />
     </main>
   );
 }

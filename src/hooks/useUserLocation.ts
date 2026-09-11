@@ -3,7 +3,6 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useFloodStore } from '@/store/useFloodStore';
 import { getNearbyEmergencyServices } from '@/utils/emergencyServices';
-import { fetchGlobalEarthquakes, fetchLiveWeatherHazards } from '@/utils/globalHazards';
 
 export function useUserLocation() {
   const {
@@ -12,35 +11,17 @@ export function useUserLocation() {
     setNearbyServices,
     evaluateSafetyStatus,
     setMapCenterTarget,
-    addGlobalHazards,
-    setCurrentWeather,
   } = useFloodStore();
 
   const watchIdRef = useRef<number | null>(null);
   const initialLoadDoneRef = useRef(false);
 
-  // Update services, live weather, and safety for a given coordinate pair anywhere in the world
+  // Update emergency rescue services and flood safety for active coordinates
   const updateLocationContext = useCallback(
-    async (lat: number, lng: number, placeLabel = 'Your Location') => {
+    async (lat: number, lng: number) => {
       evaluateSafetyStatus(lat, lng);
 
-      // 1. Fetch live meteorological conditions from Open-Meteo
-      fetchLiveWeatherHazards(lat, lng, placeLabel).then(({ weather, dynamicHazards }) => {
-        setCurrentWeather({
-          temp: weather.temp,
-          precipitation: weather.precipitation,
-          windSpeed: weather.windSpeed,
-          condition: weather.condition,
-          alert: dynamicHazards.length > 0 ? dynamicHazards[0].name : undefined,
-        });
-
-        if (dynamicHazards.length > 0) {
-          addGlobalHazards(dynamicHazards);
-        }
-        evaluateSafetyStatus(lat, lng);
-      });
-
-      // 2. Fetch nearby emergency services from OpenStreetMap Overpass
+      // Fetch nearby emergency facilities (hospitals, shelters, police, fire)
       setNearbyServices({ loading: true, error: null });
       try {
         const services = await getNearbyEmergencyServices(lat, lng);
@@ -55,11 +36,11 @@ export function useUserLocation() {
       } catch {
         setNearbyServices({
           loading: false,
-          error: 'Failed to load emergency services. Local fallback active.',
+          error: 'Using verified regional emergency services fallback.',
         });
       }
     },
-    [evaluateSafetyStatus, setNearbyServices, setCurrentWeather, addGlobalHazards]
+    [evaluateSafetyStatus, setNearbyServices]
   );
 
   // Trigger browser geolocation
@@ -100,10 +81,10 @@ export function useUserLocation() {
         // Center map on user's real location
         setMapCenterTarget([lat, lng]);
 
-        // Update emergency services, live weather & safety status
-        updateLocationContext(lat, lng, 'Your Location');
+        // Update emergency services & safety status
+        updateLocationContext(lat, lng);
 
-        // Subscribe to watchPosition for live position updates
+        // Subscribe to watchPosition for live position tracking
         if (watchIdRef.current !== null) {
           navigator.geolocation.clearWatch(watchIdRef.current);
         }
@@ -121,17 +102,17 @@ export function useUserLocation() {
             evaluateSafetyStatus(nextLat, nextLng);
           },
           (err) => {
-            console.warn('Geolocation watchPosition notice:', err.message);
+            console.warn('Geolocation watch notice:', err.message);
           },
           { enableHighAccuracy: true, maximumAge: 5000 }
         );
       },
       (err) => {
-        let message = 'Location access is required to find nearby emergency services.';
+        let message = 'Location access is required to find nearby flood shelters.';
         let permission: 'denied' | 'unavailable' = 'unavailable';
 
         if (err.code === err.PERMISSION_DENIED) {
-          message = 'Location access is required to find nearby emergency services.';
+          message = 'Location access is required to find nearby flood shelters.';
           permission = 'denied';
         } else if (err.code === err.POSITION_UNAVAILABLE) {
           message = 'Location information is currently unavailable.';
@@ -147,31 +128,21 @@ export function useUserLocation() {
           permissionState: permission,
         });
 
-        // If GPS is denied or unavailable, ensure default location context is fully loaded
-        const fallbackLat = userLocation.latitude ?? 19.0596;
+        const fallbackLat = userLocation.latitude ?? 19.0626;
         const fallbackLng = userLocation.longitude ?? 72.8626;
-        updateLocationContext(fallbackLat, fallbackLng, 'Default Hub');
+        updateLocationContext(fallbackLat, fallbackLng);
       },
       options
     );
   }, [setUserLocation, setMapCenterTarget, updateLocationContext, evaluateSafetyStatus, userLocation.latitude, userLocation.longitude]);
 
-  // Automatically detect location when the user opens the app!
+  // Automatically detect location when the user opens the app
   useEffect(() => {
     if (!initialLoadDoneRef.current) {
       initialLoadDoneRef.current = true;
-
-      // Automatically request user location right away
       requestLocation();
-
-      // Fetch live real-time USGS earthquakes worldwide
-      fetchGlobalEarthquakes().then((quakes) => {
-        if (quakes.length > 0) {
-          addGlobalHazards(quakes);
-        }
-      });
     }
-  }, [requestLocation, addGlobalHazards]);
+  }, [requestLocation]);
 
   // Cleanup watch on unmount
   useEffect(() => {
