@@ -3,12 +3,17 @@
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import type { GeoJsonObject } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import { useFloodStore } from '@/store/useFloodStore';
 import { INUNDATION_DATA, DRAINAGE_DATA, ROUTE_DATA } from '@/data/mockGeoJSON';
+import UserLocationMarker from './UserLocationMarker';
+import EmergencyMarkers from './EmergencyMarkers';
+import HazardMarkers from './HazardMarkers';
+import EvacuationRouteLayer from './EvacuationRouteLayer';
 
 // Fix for default Leaflet icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -17,12 +22,21 @@ L.Icon.Default.mergeOptions({
 
 function MapUpdater() {
   const map = useMap();
+  const { mapCenterTarget, setMapCenterTarget } = useFloodStore();
+
   useEffect(() => {
-    // Optionally update map center or trigger resize
     setTimeout(() => {
       map.invalidateSize();
     }, 100);
   }, [map]);
+
+  useEffect(() => {
+    if (mapCenterTarget) {
+      map.flyTo(mapCenterTarget, 14, { duration: 1.2 });
+      setMapCenterTarget(null);
+    }
+  }, [mapCenterTarget, map, setMapCenterTarget]);
+
   return null;
 }
 
@@ -66,10 +80,11 @@ export default function MapClient() {
         url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
       />
       
+      {/* Existing street inundation layer (preserved) */}
       {layerVisibility.streets && (
         <GeoJSON
           key={`inundation-${selectedTimeWindow}`}
-          data={filteredInundation as any}
+          data={filteredInundation as GeoJsonObject}
           style={(feature) => ({
             color: getInundationColor(feature?.properties?.waterDepthCm || 0),
             weight: 6,
@@ -83,10 +98,11 @@ export default function MapClient() {
         />
       )}
 
+      {/* Existing drainage network layer (preserved) */}
       {layerVisibility.drainage && (
         <GeoJSON
           key="drainage"
-          data={DRAINAGE_DATA as any}
+          data={DRAINAGE_DATA as GeoJsonObject}
           pointToLayer={(feature, latlng) => {
             return L.marker(latlng, { icon: getDrainageIcon(feature.properties.status) });
           }}
@@ -98,10 +114,11 @@ export default function MapClient() {
         />
       )}
 
+      {/* Existing primary route (preserved) */}
       {(activeRoute === 'primary' || activeRoute === 'both') && (
         <GeoJSON
           key="route-primary"
-          data={ROUTE_DATA.features.filter((f) => f.properties.type === 'primary') as any}
+          data={ROUTE_DATA.features.filter((f) => f.properties.type === 'primary') as unknown as GeoJsonObject}
           style={() => ({
             color: '#ef4444',
             weight: 8,
@@ -111,10 +128,11 @@ export default function MapClient() {
         />
       )}
 
+      {/* Existing alternate route (preserved) */}
       {(activeRoute === 'alternate' || activeRoute === 'both') && (
         <GeoJSON
           key="route-alternate"
-          data={ROUTE_DATA.features.filter((f) => f.properties.type === 'alternate') as any}
+          data={ROUTE_DATA.features.filter((f) => f.properties.type === 'alternate') as unknown as GeoJsonObject}
           style={() => ({
             color: '#22c55e',
             weight: 6,
@@ -123,6 +141,18 @@ export default function MapClient() {
           })}
         />
       )}
+
+      {/* Multi-Disaster Hazard Layers (New) */}
+      <HazardMarkers />
+
+      {/* Nearby Emergency Service Markers: 🏥, 👮, 🚒, 🏠 (New) */}
+      <EmergencyMarkers />
+
+      {/* Active Evacuation Route Navigation Layer (New) */}
+      <EvacuationRouteLayer />
+
+      {/* User GPS Location Marker: 📍 YOU ARE HERE (New) */}
+      <UserLocationMarker />
 
       <MapUpdater />
     </MapContainer>
