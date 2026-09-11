@@ -1,13 +1,20 @@
 'use client';
 
-import { Waves } from 'lucide-react';
+import Image from 'next/image';
 
 export default function HeaderBranding() {
   return (
     <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-3.5 max-w-sm w-80 flex items-center justify-between">
-      <div className="flex items-center gap-2.5">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
-          <Waves className="w-5 h-5" />
+      <div className="flex items-center gap-3">
+        <div className="relative w-11 h-11 shrink-0">
+          <Image
+            src="/logo.png"
+            alt="HYDRA Logo"
+            width={44}
+            height={44}
+            className="w-full h-full object-contain drop-shadow-md rounded-full"
+            priority
+          />
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
