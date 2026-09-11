@@ -15,6 +15,8 @@ import {
   Shield,
   Droplets,
   Route,
+  Loader2,
+  Cpu,
 } from 'lucide-react';
 import { METRO_CONFIGS } from '@/data/metroFloodData';
 import { LeadTimeWindow } from '@/types';
@@ -29,6 +31,9 @@ export default function RouteInspector() {
     setActiveRoute,
     layerVisibility,
     toggleLayerVisibility,
+    requestSafeRoute,
+    liveSafeRoute,
+    isCalculatingRoute,
   } = useFloodStore();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -57,6 +62,24 @@ export default function RouteInspector() {
       primaryMsg: `Inundated: Velachery Lake Breach (+${rainfallIntensity >= 40 ? 55 : 25} cm depth)`,
       altMsg: 'Safe: 100 Feet Elevated Bypass Corridor',
     },
+  };
+
+  const corridorCoords: Record<string, { start: [number, number]; dest: [number, number] }> = {
+    mumbai: { start: [19.0626, 72.8626], dest: [19.0990, 72.8745] },
+    delhi: { start: [28.6328, 77.2197], dest: [28.6428, 77.2205] },
+    chennai: { start: [12.9785, 80.2185], dest: [12.9997, 80.2376] },
+  };
+
+  const handleSelectRoute = (type: 'primary' | 'alternate') => {
+    setActiveRoute(type);
+    const coords = corridorCoords[activeMetro] || corridorCoords.mumbai;
+    requestSafeRoute(
+      coords.start[0],
+      coords.start[1],
+      coords.dest[0],
+      coords.dest[1],
+      type === 'alternate'
+    );
   };
 
   const currentRouteInfo = routeOrigins[activeMetro] || routeOrigins.mumbai;
@@ -173,6 +196,19 @@ export default function RouteInspector() {
             <span className="text-[10px] text-gray-400 font-mono">1D SWMM</span>
           </label>
 
+          <label className="flex items-center justify-between p-2 rounded-xl bg-gray-50/70 hover:bg-gray-100/70 cursor-pointer select-none transition-colors">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={layerVisibility.hotspots}
+                onChange={() => toggleLayerVisibility('hotspots')}
+                className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 cursor-pointer accent-orange-600"
+              />
+              <span className="font-bold text-gray-800">⚠️ Waterlogging Hotspots</span>
+            </div>
+            <span className="text-[10px] text-orange-600 font-mono font-bold">4 Levels</span>
+          </label>
+
           <div className="flex items-center gap-1.5 px-2 text-[10px] text-gray-500 font-medium">
             <Droplets className="w-3 h-3 text-blue-500 shrink-0" />
             <span>Coupled to micro-DEM topography &amp; high tide</span>
@@ -249,7 +285,7 @@ export default function RouteInspector() {
         {/* Route Selectors */}
         <div className="space-y-2 pt-1">
           <button
-            onClick={() => setActiveRoute('primary')}
+            onClick={() => handleSelectRoute('primary')}
             className={`w-full flex items-start gap-2.5 p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
               activeRoute === 'primary' || activeRoute === 'both'
                 ? 'border-red-200 bg-red-50/80 shadow-xs'
@@ -267,7 +303,7 @@ export default function RouteInspector() {
           </button>
 
           <button
-            onClick={() => setActiveRoute('alternate')}
+            onClick={() => handleSelectRoute('alternate')}
             className={`w-full flex items-start gap-2.5 p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
               activeRoute === 'alternate' || activeRoute === 'both'
                 ? 'border-emerald-200 bg-emerald-50/80 shadow-xs'
@@ -284,6 +320,46 @@ export default function RouteInspector() {
             </div>
           </button>
         </div>
+
+        {/* Live Pathfinding Telemetry from Backend */}
+        {isCalculatingRoute && (
+          <div className="flex items-center gap-1.5 p-2 bg-blue-50 text-blue-700 rounded-xl text-[10px] font-mono">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>Calculating Dijkstra safe route via FastAPI...</span>
+          </div>
+        )}
+
+        {liveSafeRoute && !isCalculatingRoute && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-[11px] space-y-1">
+            <div className="flex items-center justify-between font-black text-emerald-900">
+              <span className="flex items-center gap-1">
+                <Cpu className="w-3 h-3 text-emerald-600" />
+                <span>FastAPI Routing Engine</span>
+              </span>
+              <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                {liveSafeRoute.properties.pathfinding_algorithm?.toUpperCase() || 'DIJKSTRA'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-slate-600">
+              <span>Path Distance:</span>
+              <span className="font-bold text-emerald-800 font-mono">
+                {liveSafeRoute.properties.distance_km} km ({liveSafeRoute.properties.nodes_count} nodes)
+              </span>
+            </div>
+            {liveSafeRoute.properties.flooded_segments_avoided > 0 && (
+              <div className="flex items-center justify-between text-[10px] text-slate-600">
+                <span>Flooded Segments Detoured:</span>
+                <span className="font-bold text-emerald-700 font-mono">
+                  {liveSafeRoute.properties.flooded_segments_avoided}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-0.5">
+              <span>Engine Latency:</span>
+              <span>{liveSafeRoute.properties.calculation_time_ms} ms</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

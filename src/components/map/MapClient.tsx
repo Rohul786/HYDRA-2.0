@@ -10,6 +10,7 @@ import { getMetroGeoJSON, METRO_CONFIGS } from '@/data/metroFloodData';
 import UserLocationMarker from './UserLocationMarker';
 import EmergencyMarkers from './EmergencyMarkers';
 import EvacuationRouteLayer from './EvacuationRouteLayer';
+import WaterloggingHotspotsLayer from './WaterloggingHotspotsLayer';
 
 // Fix for default Leaflet icons
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -60,6 +61,7 @@ export default function MapClient() {
     activeRoute,
     layerVisibility,
     setSelectedFeature,
+    liveFloodRiskGeoJSON,
   } = useFloodStore();
 
   // Dynamically compute coupled ML Inundation and Drainage Graph GeoJSON
@@ -115,23 +117,74 @@ export default function MapClient() {
         />
       )}
 
-      {/* 2. Street Inundation Depth Segments (Coupled ML Model Output) */}
+      {/* 2. Street Inundation Depth Segments (Prefers FastAPI Backend GeoJSON, falls back to physics surrogate) */}
       {layerVisibility.streets && (
         <GeoJSON
-          key={`inundation-${activeMetro}-${selectedTimeWindow}-${rainfallIntensity}-${tidalState}`}
-          data={geoData.inundation as unknown as GeoJsonObject}
-          style={(feature) => ({
-            color: getInundationColor(feature?.properties?.waterDepthCm || 0),
-            weight: 7,
-            opacity: 0.85,
-          })}
+          key={
+            liveFloodRiskGeoJSON && liveFloodRiskGeoJSON.features?.length
+              ? `backend-risk-${activeMetro}-${liveFloodRiskGeoJSON.features.length}`
+              : `inundation-${activeMetro}-${selectedTimeWindow}-${rainfallIntensity}-${tidalState}`
+          }
+          data={
+            (liveFloodRiskGeoJSON && liveFloodRiskGeoJSON.features?.length
+              ? liveFloodRiskGeoJSON
+              : geoData.inundation) as unknown as GeoJsonObject
+          }
+          style={(feature) => {
+            const props = feature?.properties || {};
+            const depth =
+              props.waterDepthCm ??
+              (props.flood_risk_level === 'SEVERE' || props.flood_risk_level === 'HIGH'
+                ? 35
+                : props.flood_risk_level === 'MODERATE'
+                ? 15
+                : 5);
+            return {
+              color: getInundationColor(depth),
+              weight: 6,
+              opacity: 0.85,
+            };
+          }}
           onEachFeature={(feature, layer) => {
+            const props = feature.properties || {};
+            const streetName =
+              props.streetName || props.name || `Road Segment ${props.cell_id || ''}`;
+            const depth =
+              props.waterDepthCm ??
+              (props.flood_risk_level === 'SEVERE' || props.flood_risk_level === 'HIGH'
+                ? 35
+                : props.flood_risk_level === 'MODERATE'
+                ? 15
+                : 5);
+            const rawRisk = (props.riskLevel || props.flood_risk_level || 'SAFE').toLowerCase();
+            const riskLevel: 'safe' | 'warning' | 'critical' =
+              rawRisk === 'severe' || rawRisk === 'high' || rawRisk === 'critical'
+                ? 'critical'
+                : rawRisk === 'moderate' || rawRisk === 'warning'
+                ? 'warning'
+                : 'safe';
+            const elevation = props.elevationM || props.elevation_m || 8.5;
+
             layer.on({
-              click: () => setSelectedFeature({ type: 'street', data: feature.properties }),
+              click: () =>
+                setSelectedFeature({
+                  type: 'street',
+                  data: {
+                    segmentId: props.segmentId || String(props.cell_id || '0'),
+                    streetName,
+                    waterDepthCm: depth,
+                    riskLevel,
+                    predictedTimeWindow: selectedTimeWindow,
+                    elevationM: elevation,
+                    slopePct: props.slopePct || 1.2,
+                    imperviousnessPct: Math.round((props.impervious_ratio || 0.85) * 100),
+                    catchmentAreaHa: 1.5,
+                  },
+                }),
             });
             // Tooltip on hover showing live water depth
             layer.bindTooltip(
-              `<strong>${feature.properties.streetName}</strong><br/>Depth: <b>${feature.properties.waterDepthCm} cm</b> (${feature.properties.riskLevel.toUpperCase()})<br/>DEM: ${feature.properties.elevationM}m MSL`,
+              `<strong>${streetName}</strong><br/>Depth: <b>${depth} cm</b> (${riskLevel.toUpperCase()})<br/>DEM: ${elevation}m MSL`,
               { sticky: true, opacity: 0.9 }
             );
           }}
@@ -202,7 +255,10 @@ export default function MapClient() {
       {/* 7. Active Evacuation Route Navigation Layer */}
       <EvacuationRouteLayer />
 
-      {/* 8. User GPS Location Marker: 📍 YOU ARE HERE */}
+      {/* 8. Waterlogging Hotspot Risk Layer (Low, Moderate, High, Critical) */}
+      <WaterloggingHotspotsLayer />
+
+      {/* 9. User GPS Location Marker: 📍 YOU ARE HERE */}
       <UserLocationMarker />
 
       <MapUpdater />

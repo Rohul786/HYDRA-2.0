@@ -16,9 +16,21 @@ export default function MetroRadarBar() {
     setTidalState,
     selectedTimeWindow,
     setTimeWindow,
+    syncBackendFloodRisk,
+    isSyncingFloodRisk,
+    isDemoMode,
+    toggleDemoMode,
   } = useFloodStore();
 
   const [currentTime, setCurrentTime] = useState<string>('');
+
+  // Debounced background synchronization with backend flood risk pipeline
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      syncBackendFloodRisk();
+    }, 1200);
+    return () => clearTimeout(handler);
+  }, [rainfallIntensity, activeMetro, syncBackendFloodRisk]);
 
   useEffect(() => {
     const update = () => {
@@ -80,6 +92,11 @@ export default function MetroRadarBar() {
             <span className="flex items-center gap-1 text-blue-400 text-[11px] font-bold">
               <Radio className="w-3.5 h-3.5 animate-pulse" />
               Doppler Radar:
+              {isSyncingFloodRisk && (
+                <span className="text-[9px] text-cyan-300 font-mono font-normal animate-pulse">
+                  (syncing API nowcast...)
+                </span>
+              )}
             </span>
             <span
               className={`px-2 py-0.5 rounded-md text-[11px] font-black font-mono ${
@@ -178,7 +195,29 @@ export default function MetroRadarBar() {
         ))}
       </div>
 
-      {/* 5. Live Digital Clock & Radar Link Ticker */}
+      {/* 5. Demo Mode Toggle & Indicator (SIH Prototype) */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={toggleDemoMode}
+          className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
+            isDemoMode
+              ? 'bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/40 animate-pulse'
+              : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border-slate-700'
+          }`}
+          title="Toggle SIH presentation demo scenario (Simulated cloudburst & municipal surcharge)"
+        >
+          <span>⚡</span>
+          <span>{isDemoMode ? 'DEMO ACTIVE' : 'DEMO MODE'}</span>
+        </button>
+
+        {isDemoMode && (
+          <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/40">
+            SIMULATED DATA
+          </span>
+        )}
+      </div>
+
+      {/* 6. Live Digital Clock & Radar Link Ticker */}
       <div className="hidden xl:flex items-center gap-2 pl-2 border-l border-slate-800 text-[11px] font-mono text-slate-400 shrink-0">
         <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
         <span className="font-bold text-slate-200">{currentTime || 'LIVE'}</span>

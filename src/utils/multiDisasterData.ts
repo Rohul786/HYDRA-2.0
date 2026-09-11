@@ -1,0 +1,128 @@
+import { MultiDisasterEvent } from '@/types';
+
+/**
+ * Multi-Disaster Hazard Monitoring Catalog
+ *
+ * Covers all relevant Indian meteorological and hydrological hazards:
+ * Flood, Flash Flood, Extreme Rainfall, Cloudburst Risk, Cyclone,
+ * Landslide, Lightning, Storm, Heatwave.
+ */
+
+export const ACTIVE_DISASTER_EVENTS: Record<string, MultiDisasterEvent[]> = {
+  mumbai: [
+    {
+      id: 'dis-mb-1',
+      type: 'Flood',
+      severity: 'high',
+      location: 'Mithi River Basin (Kurla-Bandra Belt)',
+      time: 'Next 60 minutes',
+      probabilityPct: 82,
+      confidence: 'HIGH',
+      affectedArea: 'Low-lying wards L, H-East, and G-North',
+      officialSource: 'IMD Mumbai Doppler & CWC Flood Forecast Cell',
+    },
+    {
+      id: 'dis-mb-2',
+      type: 'Cloudburst Risk',
+      severity: 'critical',
+      location: 'Sanjay Gandhi National Park & Powai Ridge',
+      time: 'Next 30–45 minutes',
+      probabilityPct: 76,
+      confidence: 'MEDIUM',
+      affectedArea: 'Northern suburban catchment & Tulsi lake spillway',
+      officialSource: 'IMD Doppler Convective Cell Alert',
+    },
+    {
+      id: 'dis-mb-3',
+      type: 'Lightning',
+      severity: 'moderate',
+      location: 'Thane Creek & Eastern Coastal Strip',
+      time: 'Immediate (0–30 min)',
+      probabilityPct: 88,
+      confidence: 'HIGH',
+      affectedArea: 'Chembur, Vashi Bridge, Trombay corridor',
+      officialSource: 'Damini Lightning Detection Network (IITM)',
+    },
+    {
+      id: 'dis-mb-4',
+      type: 'Cyclone',
+      severity: 'low',
+      location: 'Arabian Sea (East-Central Sector)',
+      time: 'Next 48 hours',
+      probabilityPct: 35,
+      confidence: 'MEDIUM',
+      affectedArea: 'North Maharashtra Coastal Waters',
+      officialSource: 'RSMC New Delhi Tropical Cyclone Bulletin',
+    },
+  ],
+  delhi: [
+    {
+      id: 'dis-dl-1',
+      type: 'Flash Flood',
+      severity: 'high',
+      location: 'Yamuna Floodplain (Old Railway Bridge)',
+      time: 'Next 120 minutes',
+      probabilityPct: 78,
+      confidence: 'HIGH',
+      affectedArea: 'Kashmere Gate, Monastery Market, Yamuna Bazaar',
+      officialSource: 'Central Water Commission (CWC) Hathnikund Release',
+    },
+    {
+      id: 'dis-dl-2',
+      type: 'Storm',
+      severity: 'moderate',
+      location: 'Central & Southern NCR',
+      time: 'Next 60 minutes',
+      probabilityPct: 65,
+      confidence: 'MEDIUM',
+      affectedArea: 'IGI Airport, Vasant Kunj, Ridge Area',
+      officialSource: 'IMD Mausam Radar Palam Station',
+    },
+    {
+      id: 'dis-dl-3',
+      type: 'Heatwave',
+      severity: 'low',
+      location: 'Western Delhi Sub-basin',
+      time: 'Seasonal Horizon',
+      probabilityPct: 20,
+      confidence: 'HIGH',
+      affectedArea: 'Najafgarh, Narela',
+      officialSource: 'IMD National Weather Forecasting Centre',
+    },
+  ],
+  chennai: [
+    {
+      id: 'dis-ch-1',
+      type: 'Flood',
+      severity: 'critical',
+      location: 'Adyar River Basin & Chembarambakkam Outfall',
+      time: 'Next 60 minutes',
+      probabilityPct: 85,
+      confidence: 'HIGH',
+      affectedArea: 'Saidapet, Jafferkhanpet, Kotturpuram',
+      officialSource: 'Water Resources Department (WRD) Tamil Nadu',
+    },
+    {
+      id: 'dis-ch-2',
+      type: 'Extreme Rainfall',
+      severity: 'high',
+      location: 'Sholinganallur & OMR IT Corridor',
+      time: 'Next 90 minutes',
+      probabilityPct: 74,
+      confidence: 'HIGH',
+      affectedArea: 'South Chennai Coastal Plains',
+      officialSource: 'IMD Chennai Regional Meteorological Centre',
+    },
+    {
+      id: 'dis-ch-3',
+      type: 'Lightning',
+      severity: 'moderate',
+      location: 'Ennore Port & North Chennai Harbor',
+      time: 'Immediate (0–30 min)',
+      probabilityPct: 80,
+      confidence: 'MEDIUM',
+      affectedArea: 'Manali, Thiruvottiyur, Ennore',
+      officialSource: 'IITM National Lightning Early Warning Network',
+    },
+  ],
+};

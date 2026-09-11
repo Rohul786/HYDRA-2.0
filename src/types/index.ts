@@ -142,3 +142,303 @@ export type SelectedEntity =
   | { type: 'drain'; data: DrainageNodeProperties }
   | { type: 'emergency'; data: EmergencyService }
   | null;
+
+// Backend API Integration Types
+export interface BackendHealthResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  service: string;
+  timestamp: string;
+  uptime_seconds: number;
+  in_memory_graphs: {
+    road_network: {
+      loaded: boolean;
+      nodes: number;
+      edges: number;
+      source?: string;
+    };
+    drainage_network: {
+      loaded: boolean;
+      nodes: number;
+      edges: number;
+      source?: string;
+    };
+  };
+}
+
+export interface BackendSafeRouteProperties {
+  distance_m: number;
+  distance_km: number;
+  baseline_distance_m: number;
+  detour_additional_m: number;
+  safe: boolean;
+  routing_strategy: string;
+  pathfinding_algorithm: string;
+  flooded_segments_avoided: number;
+  flooded_segments_traversed: number;
+  total_flooded_edges_in_network: number;
+  flood_risk_source: string;
+  drainage_network_loaded: boolean;
+  nodes_count: number;
+  start: {
+    lat: number;
+    lon: number;
+    geojson_coords: [number, number];
+    leaflet_coords: [number, number];
+    snapped_node?: number;
+  };
+  end: {
+    lat: number;
+    lon: number;
+    geojson_coords: [number, number];
+    leaflet_coords: [number, number];
+    snapped_node?: number;
+  };
+  calculation_time_ms: number;
+}
+
+export type BackendSafeRouteFeature = Feature<LineString, BackendSafeRouteProperties>;
+
+export interface BackendWeatherCurrentResponse {
+  status: string;
+  provider: string;
+  latitude: number;
+  longitude: number;
+  state_name: string;
+  timezone: string;
+  current: {
+    temperature_c: number;
+    feels_like_c?: number;
+    humidity_pct: number;
+    precipitation_mm_hr: number;
+    weather_code: number;
+    weather_description: string;
+    wind_speed_kmh: number;
+    wind_direction_deg?: number;
+    uv_index?: number;
+    pressure_hpa?: number;
+  };
+  hourly_next_6h?: Array<{
+    time: string;
+    temperature_c: number;
+    humidity_pct: number;
+    precipitation_mm: number;
+    precipitation_probability_pct: number;
+    weather_code: number;
+    weather_description: string;
+    wind_speed_kmh: number;
+    uv_index?: number;
+  }>;
+  is_fallback: boolean;
+  fallback_tier?: string;
+  fetched_at: string;
+}
+
+// SIH Early Warning & Probabilistic Nowcasting Types
+export type AlertLevel = 'MONITOR' | 'WATCH' | 'PRE_ALERT' | 'CRITICAL' | 'DOWNGRADED';
+
+export type NowcastWindowKey = '30m' | '60m' | '120m';
+
+export interface NowcastWindowData {
+  timeWindow: string; // e.g. "Next 30 minutes", "Next 60 minutes", "Next 120 minutes"
+  expectedRangeMmHr: string; // e.g. "55–85 mm/hour"
+  minRainfallMmHr: number;
+  maxRainfallMmHr: number;
+  probabilityPct: number; // e.g. 78%
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  alertType: 'MONITOR' | 'WATCH' | 'PRE_ALERT' | 'CRITICAL';
+  intensityLabel: 'Light' | 'Moderate' | 'Heavy' | 'Very Heavy / Extreme';
+  dataSource: string;
+  lastUpdated: string;
+  isSimulated?: boolean;
+}
+
+export interface ExtremeRainfallEvent {
+  detected: boolean;
+  title: string; // "Potential Extreme Rainfall Event" | "Cloudburst-like rainfall risk"
+  probabilityPct: number;
+  expectedIntensity: 'Moderate' | 'Heavy' | 'Very Heavy / Extreme';
+  estimatedArrivalMins: number;
+  expectedDurationMins: number;
+  confidence: 'Low' | 'Medium' | 'Medium-High' | 'High';
+  affectedArea: string;
+  movementDirection: string;
+  isSimulated?: boolean;
+}
+
+export interface RunoffEstimate {
+  rainfallMm: number; // e.g. 100 mm
+  runoffVolumeM3: number; // e.g. 72,000 m3
+  catchmentAreaHa: number;
+  runoffCoefficient: number; // e.g. 0.72 (impervious vs pervious)
+  imperviousAreaPct: number;
+  isSimulated?: boolean;
+  formulaDescription: string;
+}
+
+export interface DrainageStressMetric {
+  inflowLps: number;
+  capacityLps: number;
+  stressPct: number; // e.g. 145%
+  potentialExcessM3: number; // e.g. 25,000 m3
+  classification: 'Normal' | 'Moderate' | 'High' | 'Critical';
+  pumpsOperatingCount: number;
+  pumpsTotalCount: number;
+  isSimulated?: boolean;
+}
+
+export interface WaterloggingHotspot {
+  id: string;
+  name: string;
+  coordinates: [number, number]; // [lat, lng]
+  riskLevel: 'low' | 'moderate' | 'high' | 'critical';
+  rainfallRange: string;
+  expectedRunoffM3: string;
+  drainageStressPct: number;
+  estimatedWaterDepthRangeM: string; // e.g. "0.4–0.8 m"
+  timeToImpactMins: number;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  nearbyCriticalInfrastructure: string[];
+  recommendedAction: string;
+}
+
+export interface MunicipalAuthority {
+  id: string;
+  name: string;
+  jurisdiction: string;
+  controlRoomName: string;
+  distanceKm: number;
+  status: 'Available' | 'Active Monitoring' | 'Emergency Operations Active';
+  contact: string;
+  emergencyPhone: string;
+  hasVerifiedContact: boolean;
+  directoryGuidance?: string;
+  address: string;
+}
+
+export interface MunicipalAlert {
+  alertId: string; // e.g. "HYDRA-2026-00125"
+  timestamp: string;
+  location: string;
+  severity: AlertLevel;
+  expectedRainfallRange: string;
+  probabilityPct: number;
+  drainageStressPct: number;
+  waterloggingRisk: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  estimatedLeadTimeMins: number;
+  channels: Array<'dashboard' | 'push' | 'sms' | 'email' | 'webhook'>;
+  deliveryStatus: 'generated' | 'delivered' | 'failed';
+  acknowledgementStatus: 'pending' | 'acknowledged' | 'escalated';
+  acknowledgedAt?: string;
+  recommendedActions: string[];
+}
+
+export type UpdateCycleStage =
+  | 'OBSERVE'
+  | 'ANALYZE'
+  | 'ESTIMATE'
+  | 'UPDATE'
+  | 'VERIFY'
+  | 'RECALCULATE'
+  | 'ALERT'
+  | 'DOWNGRADED';
+
+export interface ContinuousUpdateCycle {
+  stage: UpdateCycleStage;
+  previousProbabilityPct: number;
+  currentProbabilityPct: number;
+  lastRecalculatedAt: string;
+  downgradeReason?: string;
+  cycleHistory: Array<{
+    timeLabel: string;
+    probabilityPct: number;
+    status: string;
+  }>;
+}
+
+export interface ForecastReliabilityMetric {
+  historicalEventsCount: number;
+  detectionRatePct: number;
+  meanLeadTimeMins: number;
+  meanErrorPct: number;
+  recentEvaluations: Array<{
+    eventId: string;
+    date: string;
+    predictedRange: string;
+    observedMm: number;
+    forecastErrorPct: number;
+    leadTimeMins: number;
+    result: string;
+  }>;
+}
+
+export interface MultiDisasterEvent {
+  id: string;
+  type:
+    | 'Flood'
+    | 'Flash Flood'
+    | 'Extreme Rainfall'
+    | 'Cloudburst Risk'
+    | 'Cyclone'
+    | 'Landslide'
+    | 'Lightning'
+    | 'Storm'
+    | 'Heatwave';
+  severity: 'low' | 'moderate' | 'high' | 'critical';
+  location: string;
+  time: string;
+  probabilityPct: number;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  affectedArea: string;
+  officialSource: string;
+}
+
+export interface ExplainableRiskFactor {
+  icon: string;
+  label: string;
+  value: string;
+  level: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+  description: string;
+}
+
+// User Profile & Onboarding Types
+export interface UserProfile {
+  id: string;
+  googleId: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string;
+  phone?: string | null;
+  phoneVerified: boolean;
+  smsConsent: boolean;
+  pushConsent: boolean;
+  locationPermission: 'prompt' | 'granted' | 'denied' | 'manual';
+  createdAt: string;
+}
+
+export interface UserAlertPreferences {
+  pushEnabled: boolean;
+  smsEnabled: boolean;
+  severeRainfall: boolean;
+  floodRisk: boolean;
+  waterlogging: boolean;
+  cyclone: boolean;
+  extremeWeather: boolean;
+  nearbyDisaster: boolean;
+  municipalAlerts: boolean;
+}
+
+export interface UserAlertHistoryItem {
+  id: string;
+  eventId: string;
+  timestamp: string;
+  alertType: string;
+  severity: AlertLevel;
+  location: string;
+  probabilityPct: number;
+  channels: string[];
+  deliveryStatus: 'Delivered' | 'Pending' | 'Suppressed';
+  isDemo?: boolean;
+}
+
+
+

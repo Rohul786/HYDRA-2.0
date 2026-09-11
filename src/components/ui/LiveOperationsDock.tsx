@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useFloodStore } from '@/store/useFloodStore';
 import { useUserLocation } from '@/hooks/useUserLocation';
@@ -10,9 +10,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   AlertTriangle,
-  MapPin,
-  Crosshair,
-  Loader2,
   Navigation,
   Phone,
   ExternalLink,
@@ -22,7 +19,20 @@ import {
   CloudRain,
   Radio,
   Building2,
+  Activity,
+  Info,
+  Layers,
+  Loader2,
 } from 'lucide-react';
+
+import NowcastCard from './NowcastCard';
+import DrainageRunoffCard from './DrainageRunoffCard';
+import NearestMunicipalityCard from './NearestMunicipalityCard';
+import MultiDisasterCard from './MultiDisasterCard';
+import LocationController from './LocationController';
+import ContinuousUpdateBanner from './ContinuousUpdateBanner';
+import ForecastReliabilityCard from './ForecastReliabilityCard';
+import UserProfileMenu from './UserProfileMenu';
 
 export default function LiveOperationsDock() {
   const {
@@ -35,19 +45,31 @@ export default function LiveOperationsDock() {
     activeNavigationDestination,
     setActiveNavigationDestination,
     setMapCenterTarget,
+    backendStatus,
+    backendLatencyMs,
+    checkBackendConnection,
+    syncBackendWeather,
+    liveSafeRoute,
+    isCalculatingRoute,
+    openDisclaimerModal,
+    isDemoMode,
   } = useFloodStore();
 
-  const {
-    latitude,
-    longitude,
-    loading: gpsLoading,
-    isRealGps,
-    requestLocation,
-  } = useUserLocation();
+  const { latitude, longitude } = useUserLocation();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'status' | 'emergency'>('status');
+  const [activeTab, setActiveTab] = useState<'status' | 'municipal' | 'emergency'>('status');
   const [serviceFilter, setServiceFilter] = useState<'all' | EmergencyServiceType>('all');
+
+  // Periodic health check and weather synchronization with backend
+  useEffect(() => {
+    checkBackendConnection();
+    syncBackendWeather();
+    const timer = setInterval(() => {
+      checkBackendConnection();
+    }, 25000);
+    return () => clearInterval(timer);
+  }, [checkBackendConnection, syncBackendWeather, activeMetro]);
 
   const config = METRO_CONFIGS[activeMetro];
 
@@ -86,7 +108,7 @@ export default function LiveOperationsDock() {
   return (
     <div
       className={`absolute top-6 left-6 z-20 transition-all duration-300 ${
-        isCollapsed ? 'w-14' : 'w-88 md:w-96'
+        isCollapsed ? 'w-14' : 'w-88 md:w-[420px]'
       }`}
     >
       {/* COLLAPSED PILL */}
@@ -135,10 +157,28 @@ export default function LiveOperationsDock() {
                     <span className="text-[9px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded-md tracking-wider">
                       2.0
                     </span>
-                    <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      LIVE
-                    </span>
+                    {backendStatus === 'connected' ? (
+                      <span
+                        className="flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200"
+                        title={`FastAPI backend connected (${backendLatencyMs ?? 0}ms)`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        API {backendLatencyMs ? `${backendLatencyMs}ms` : 'LIVE'}
+                      </span>
+                    ) : backendStatus === 'connecting' ? (
+                      <span className="flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-spin"></span>
+                        CONNECTING
+                      </span>
+                    ) : (
+                      <span
+                        className="flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200"
+                        title="Backend offline; using high-fidelity local physics surrogate fallback"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                        STANDALONE
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] font-semibold text-gray-500 mt-1 truncate">
                     Urban Flood Nowcasting System
@@ -147,6 +187,15 @@ export default function LiveOperationsDock() {
               </div>
 
               <div className="flex items-center gap-1">
+                {/* Safety Advisory / Disclaimer Button */}
+                <button
+                  onClick={openDisclaimerModal}
+                  className="p-1.5 rounded-xl hover:bg-blue-50 text-gray-400 hover:text-blue-700 transition-colors cursor-pointer"
+                  title="View HYDRA Early Warning Disclaimer & Safety Information"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+
                 <button
                   onClick={() => setIsCollapsed(true)}
                   className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
@@ -157,57 +206,63 @@ export default function LiveOperationsDock() {
               </div>
             </div>
 
-            {/* GPS Telemetry Sub-bar */}
-            <div className="mt-3 flex items-center justify-between bg-white rounded-xl p-2 border border-gray-100 shadow-sm text-xs">
-              <div className="flex items-center gap-2 truncate">
-                <MapPin className={`w-3.5 h-3.5 shrink-0 ${isRealGps ? 'text-blue-600' : 'text-gray-400'}`} />
-                <span className="text-[11px] font-bold text-gray-700 truncate">
-                  {isRealGps ? 'Live GPS Locked' : `${config.name} (${config.basinName})`}
-                </span>
+            {/* Simulated Data Watermark if in Demo Mode */}
+            {isDemoMode && (
+              <div className="mt-2 text-[10px] font-black uppercase text-purple-700 bg-purple-50 p-1.5 rounded-xl border border-purple-200 text-center tracking-wider animate-pulse">
+                ⚡ DEMO / SIMULATED DATA ACTIVE (SIH PROTOTYPE)
               </div>
-              <button
-                onClick={requestLocation}
-                disabled={gpsLoading}
-                className="flex items-center gap-1 text-[10px] font-extrabold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {gpsLoading ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Crosshair className="w-3 h-3" />
-                )}
-                <span>{isRealGps ? 'Refresh' : 'Locate'}</span>
-              </button>
+            )}
+
+            {/* Citizen Profile & Emergency Alert Channels */}
+            <div className="mt-2.5 flex items-center justify-between">
+              <UserProfileMenu />
+            </div>
+
+            {/* Location Controller (GPS / Manual Selection) */}
+            <div className="mt-2.5">
+              <LocationController />
             </div>
           </div>
 
           {/* 2. Segmented Mode Controller (Tabs) */}
-          <div className="flex items-center p-2 bg-gray-100/70 border-b border-gray-100 text-xs">
+          <div className="flex items-center p-1.5 bg-gray-100/70 border-b border-gray-100 text-xs gap-1">
             <button
               onClick={() => setActiveTab('status')}
-              className={`flex-1 py-1.5 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 rounded-xl font-bold transition-all flex items-center justify-center gap-1 text-[11px] ${
                 activeTab === 'status'
-                  ? 'bg-white text-gray-900 shadow-sm'
+                  ? 'bg-white text-gray-900 shadow-xs'
                   : 'text-gray-500 hover:text-gray-800'
               }`}
             >
               <Droplets className="w-3.5 h-3.5 text-blue-600" />
-              <span>Live Flood Status</span>
+              <span>Nowcast &amp; Risk</span>
             </button>
             <button
-              onClick={() => setActiveTab('emergency')}
-              className={`flex-1 py-1.5 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'emergency'
-                  ? 'bg-white text-gray-900 shadow-sm'
+              onClick={() => setActiveTab('municipal')}
+              className={`flex-1 py-1.5 rounded-xl font-bold transition-all flex items-center justify-center gap-1 text-[11px] ${
+                activeTab === 'municipal'
+                  ? 'bg-white text-gray-900 shadow-xs'
                   : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <Building2 className="w-3.5 h-3.5 text-red-600" />
-              <span>Nearby Help ({allServices.length})</span>
+              <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Municipal Dispatch</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('emergency')}
+              className={`flex-1 py-1.5 rounded-xl font-bold transition-all flex items-center justify-center gap-1 text-[11px] ${
+                activeTab === 'emergency'
+                  ? 'bg-white text-gray-900 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-red-600" />
+              <span>Rescue ({allServices.length})</span>
             </button>
           </div>
 
           {/* 3. Tab Body Container */}
-          <div className="p-4 overflow-y-auto space-y-3.5 text-xs flex-1">
+          <div className="p-3.5 overflow-y-auto space-y-3.5 text-xs flex-1">
             {/* TAB 1: LIVE FLOOD STATUS & METEOROLOGY */}
             {activeTab === 'status' && (
               <>
@@ -247,6 +302,18 @@ export default function LiveOperationsDock() {
                     </div>
                   </div>
                 </div>
+
+                {/* 1. Probabilistic Rainfall Nowcast Card (30m, 60m, 120m) */}
+                <NowcastCard />
+
+                {/* 2. Runoff Estimation & Drainage Stress Card */}
+                <DrainageRunoffCard />
+
+                {/* 3. Continuous Observation & Downgrade Cycle Card */}
+                <ContinuousUpdateBanner />
+
+                {/* 4. Forecast Reliability & Accuracy Card */}
+                <ForecastReliabilityCard />
 
                 {/* Live Doppler & Atmospheric Telemetry */}
                 <div className="bg-gray-50/90 rounded-2xl p-3 border border-gray-100 space-y-2">
@@ -294,15 +361,15 @@ export default function LiveOperationsDock() {
 
                 {/* Active Evacuation Route Notice if set */}
                 {activeNavigationDestination && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 flex flex-col gap-1.5">
+                  <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3 flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black text-blue-900 flex items-center gap-1.5">
-                        <Navigation className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                        Active Evacuation Destination
+                      <span className="text-[11px] font-black text-emerald-900 flex items-center gap-1.5">
+                        <Navigation className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                        <span>Active Evacuation Corridor</span>
                       </span>
                       <button
                         onClick={() => setActiveNavigationDestination(null)}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                        className="text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
                       >
                         Clear
                       </button>
@@ -313,15 +380,47 @@ export default function LiveOperationsDock() {
                     <div className="text-[11px] text-gray-600 line-clamp-1">
                       {activeNavigationDestination.address}
                     </div>
+
+                    {/* Live Pathfinding Telemetry from FastAPI /safe-route */}
+                    {isCalculatingRoute && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-blue-700 bg-blue-100/60 p-1.5 rounded-lg font-mono">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Computing shortest road detour avoiding flooded zones...</span>
+                      </div>
+                    )}
+
+                    {liveSafeRoute && !isCalculatingRoute && (
+                      <div className="bg-white/80 p-2 rounded-xl border border-emerald-100 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between font-bold text-emerald-800">
+                          <span>🛡️ Dijkstra Safe Path</span>
+                          <span className="font-mono">{liveSafeRoute.properties.distance_km} km</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                          <span>Flooded nodes avoided:</span>
+                          <span className="font-bold text-emerald-700 font-mono">
+                            {liveSafeRoute.properties.flooded_segments_avoided} segments
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                          <span>Engine calculation time:</span>
+                          <span className="font-mono">
+                            {liveSafeRoute.properties.calculation_time_ms} ms
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-xs font-bold text-blue-700">
-                        {activeNavigationDestination.distanceFormatted} away
+                      <span className="text-xs font-bold text-emerald-800">
+                        {liveSafeRoute
+                          ? `${liveSafeRoute.properties.distance_km} km detour`
+                          : `${activeNavigationDestination.distanceFormatted} away`}
                       </span>
                       <a
                         href={getGoogleMapsUrl(activeNavigationDestination)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                        className="text-[11px] font-bold text-emerald-700 hover:underline flex items-center gap-1"
                       >
                         <span>Google Maps</span>
                         <ExternalLink className="w-3 h-3" />
@@ -332,7 +431,15 @@ export default function LiveOperationsDock() {
               </>
             )}
 
-            {/* TAB 2: NEARBY EMERGENCY SERVICES (REAL VERIFIED ADDRESSES) */}
+            {/* TAB 2: MUNICIPAL RESPONSE & MULTI-HAZARD DISASTER WATCH */}
+            {activeTab === 'municipal' && (
+              <>
+                <NearestMunicipalityCard />
+                <MultiDisasterCard />
+              </>
+            )}
+
+            {/* TAB 3: NEARBY EMERGENCY SERVICES (REAL VERIFIED ADDRESSES) */}
             {activeTab === 'emergency' && (
               <>
                 {/* Filter Pills */}
