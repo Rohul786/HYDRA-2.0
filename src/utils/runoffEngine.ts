@@ -43,6 +43,34 @@ export const DEFAULT_METRO_CATCHMENTS: Record<string, CatchmentCharacteristics> 
     soilInfiltrationRateMmHr: 6.0,
     slopePct: 0.5,
   },
+  bengaluru: {
+    catchmentAreaHa: 110, // Bellandur / Koramangala Valley basin
+    imperviousPct: 79,
+    greenPct: 21,
+    soilInfiltrationRateMmHr: 5.5,
+    slopePct: 1.8,
+  },
+  kolkata: {
+    catchmentAreaHa: 105, // Central Kolkata / Circular Canal basin
+    imperviousPct: 84,
+    greenPct: 16,
+    soilInfiltrationRateMmHr: 3.8,
+    slopePct: 0.4,
+  },
+  hyderabad: {
+    catchmentAreaHa: 115, // Musi River / Hussain Sagar basin
+    imperviousPct: 76,
+    greenPct: 24,
+    soilInfiltrationRateMmHr: 6.2,
+    slopePct: 1.5,
+  },
+  kochi: {
+    catchmentAreaHa: 85, // Periyar / Vembanad backwater coastal basin
+    imperviousPct: 71,
+    greenPct: 29,
+    soilInfiltrationRateMmHr: 4.0,
+    slopePct: 0.3,
+  },
 };
 
 export function estimateUrbanRunoff(

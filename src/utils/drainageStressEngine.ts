@@ -44,6 +44,34 @@ export const METRO_DRAINAGE_CAPACITIES: Record<string, DrainageInfrastructureCon
     chokeFraction: 0.2,
     tidalLockFactor: 0.2,
   },
+  bengaluru: {
+    baseCapacityM3: 45000, // K-100 / Bellandur Valley SWD
+    pumpsTotalCount: 4,
+    pumpCapacityLps: 2800,
+    chokeFraction: 0.25,
+    tidalLockFactor: 0.0,
+  },
+  kolkata: {
+    baseCapacityM3: 50000, // Palmer Bridge & Circular Canal
+    pumpsTotalCount: 7,
+    pumpCapacityLps: 4200,
+    chokeFraction: 0.24,
+    tidalLockFactor: 0.22,
+  },
+  hyderabad: {
+    baseCapacityM3: 46000, // Musi River & Hussain Sagar Sluices
+    pumpsTotalCount: 5,
+    pumpCapacityLps: 3100,
+    chokeFraction: 0.20,
+    tidalLockFactor: 0.0,
+  },
+  kochi: {
+    baseCapacityM3: 38000, // Mullassery & Perandoor Canals
+    pumpsTotalCount: 4,
+    pumpCapacityLps: 2600,
+    chokeFraction: 0.20,
+    tidalLockFactor: 0.28,
+  },
 };
 
 export function calculateDrainageStress(

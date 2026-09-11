@@ -69,11 +69,21 @@ export interface RouteProperties {
 export type RouteFeature = Feature<LineString, RouteProperties>;
 
 // Major Indian Metro Basins
-export type MetroCity = 'mumbai' | 'delhi' | 'chennai';
+export type MetroCity =
+  | 'mumbai'
+  | 'delhi'
+  | 'chennai'
+  | 'bengaluru'
+  | 'kolkata'
+  | 'hyderabad'
+  | 'kochi';
+
+export type LocationMode = 'gps' | 'metro';
 
 export interface MetroBasinConfig {
   id: MetroCity;
   name: string;
+  regionName: string; // e.g. "Mumbai Metropolitan Region", "National Capital Region (NCR)"
   basinName: string;
   state: string;
   center: [number, number]; // [lat, lng]
@@ -82,6 +92,7 @@ export interface MetroBasinConfig {
   radarStation: string;
   primaryOutfall: string;
   description: string;
+  searchKeywords?: string[];
 }
 
 export type TidalState = 'low_tide' | 'normal' | 'high_tide';
@@ -102,6 +113,10 @@ export interface EmergencyService {
   phone?: string;
   capacity?: number;
   isDemoFallback?: boolean;
+  source?: string; // e.g. "Official Government Data" | "OpenStreetMap Verified Geospatial Data"
+  verification_status?: 'verified' | 'unverified';
+  last_verified?: string;
+  category?: EmergencyServiceType;
 }
 
 export interface NearbyEmergencyServices {
@@ -304,8 +319,13 @@ export interface WaterloggingHotspot {
 export interface MunicipalAuthority {
   id: string;
   name: string;
+  shortCode?: string;
   jurisdiction: string;
+  coverageZone?: string;
   controlRoomName: string;
+  officeName: string;
+  officeAddress: string;
+  officeCoords: [number, number]; // [lat, lng] for View on Map & Get Directions
   distanceKm: number;
   status: 'Available' | 'Active Monitoring' | 'Emergency Operations Active';
   contact: string;
@@ -313,10 +333,14 @@ export interface MunicipalAuthority {
   hasVerifiedContact: boolean;
   directoryGuidance?: string;
   address: string;
+  source: string; // e.g. "Official Government Data / Municipal Gazette"
+  verificationStatus: 'verified' | 'unverified';
+  lastVerified?: string;
 }
 
 export interface MunicipalAlert {
   alertId: string; // e.g. "HYDRA-2026-00125"
+  eventId?: string; // e.g. "HYDRA-EVENT-MUM-001" for deduplication
   timestamp: string;
   location: string;
   severity: AlertLevel;
@@ -326,10 +350,12 @@ export interface MunicipalAlert {
   waterloggingRisk: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
   estimatedLeadTimeMins: number;
   channels: Array<'dashboard' | 'push' | 'sms' | 'email' | 'webhook'>;
-  deliveryStatus: 'generated' | 'delivered' | 'failed';
+  deliveryStatus: 'generated' | 'sending' | 'delivered' | 'failed';
   acknowledgementStatus: 'pending' | 'acknowledged' | 'escalated';
   acknowledgedAt?: string;
   recommendedActions: string[];
+  responsibleAuthorityName?: string;
+  nearestOfficeName?: string;
 }
 
 export type UpdateCycleStage =

@@ -9,11 +9,14 @@ import {
   EmergencyService,
 } from '@/types';
 import { DrainageGraphNode, DrainageGraphEdge } from '@/utils/drainageGraph';
+import { VERIFIED_METRO_EMERGENCY_FACILITIES } from './mockEmergencyServices';
+import { calculateHaversineDistance, formatDistance, calculateEstimatedTravelTime } from '@/utils/geoDistance';
 
 export const METRO_CONFIGS: Record<MetroCity, MetroBasinConfig> = {
   mumbai: {
     id: 'mumbai',
     name: 'Mumbai',
+    regionName: 'Mumbai Metropolitan Region',
     basinName: 'Mithi River & BKC Basin',
     state: 'Maharashtra',
     center: [19.0626, 72.8626], // BKC
@@ -22,10 +25,12 @@ export const METRO_CONFIGS: Record<MetroCity, MetroBasinConfig> = {
     radarStation: 'IMD Colaba Doppler (DWR)',
     primaryOutfall: 'Mahim Creek / Arabian Sea',
     description: 'Hyper-local flood nowcast for Mumbai financial district & Mithi River drainage bottleneck.',
+    searchKeywords: ['mumbai', 'mmr', 'bombay', 'bkc', 'kurla', 'dadar', 'bandra', 'hindmata'],
   },
   delhi: {
     id: 'delhi',
     name: 'Delhi NCR',
+    regionName: 'National Capital Region (NCR)',
     basinName: 'Minto Bridge & Central Yamuna Basin',
     state: 'Delhi',
     center: [28.6342, 77.2255], // Minto Bridge / Connaught Place
@@ -34,10 +39,12 @@ export const METRO_CONFIGS: Record<MetroCity, MetroBasinConfig> = {
     radarStation: 'IMD Palam Doppler (DWR)',
     primaryOutfall: 'Najafgarh & Barapullah Drains / Yamuna River',
     description: 'Depression-driven urban flood nowcast for railway underpasses and Ring Road bottlenecks.',
+    searchKeywords: ['delhi', 'ncr', 'new delhi', 'minto bridge', 'connaught place', 'ito', 'yamuna'],
   },
   chennai: {
     id: 'chennai',
     name: 'Chennai',
+    regionName: 'Chennai Metropolitan Area',
     basinName: 'Velachery & Adyar Basin',
     state: 'Tamil Nadu',
     center: [12.9785, 80.2185], // Velachery
@@ -46,6 +53,63 @@ export const METRO_CONFIGS: Record<MetroCity, MetroBasinConfig> = {
     radarStation: 'IMD Chennai Port Doppler (DWR)',
     primaryOutfall: 'Adyar River Estuary / Bay of Bengal',
     description: 'Coastal marshland & lake overflow nowcasting system subject to tidal backwater choke.',
+    searchKeywords: ['chennai', 'madras', 'velachery', 'adyar', 'madipakkam', 't nagar', 'pallikaranai'],
+  },
+  bengaluru: {
+    id: 'bengaluru',
+    name: 'Bengaluru',
+    regionName: 'Bengaluru Urban & BBMP Core',
+    basinName: 'Vrishabhavathi & Bellandur Lake Basin',
+    state: 'Karnataka',
+    center: [12.9352, 77.6742], // Bellandur / Outer Ring Road
+    zoom: 14,
+    demRangeM: [870, 930],
+    radarStation: 'IMD Bengaluru Doppler Radar',
+    primaryOutfall: 'Bellandur & Varthur Lakes / Dakshina Pinakini River',
+    description: 'Valley lake cascading overflow & tech corridor stormwater nowcast subject to rapid urban runoff.',
+    searchKeywords: ['bengaluru', 'bangalore', 'bellandur', 'outer ring road', 'silk board', 'ecospace', 'koramangala'],
+  },
+  kolkata: {
+    id: 'kolkata',
+    name: 'Kolkata',
+    regionName: 'Kolkata Metropolitan Area',
+    basinName: 'Central College Street & East Kolkata Basin',
+    state: 'West Bengal',
+    center: [22.5726, 88.3639], // College Street / Central
+    zoom: 14,
+    demRangeM: [3, 11],
+    radarStation: 'IMD Kolkata Doppler (DWR)',
+    primaryOutfall: 'Circular Canal / Hooghly River & East Kolkata Wetlands',
+    description: 'Tidal estuarine river backwater lock and colonial stormwater canal nowcasting system.',
+    searchKeywords: ['kolkata', 'calcutta', 'college street', 'thanthania', 'park circus', 'howrah', 'bowbazar'],
+  },
+  hyderabad: {
+    id: 'hyderabad',
+    name: 'Hyderabad',
+    regionName: 'Hyderabad Metropolitan Area',
+    basinName: 'Musi River & Hussain Sagar Basin',
+    state: 'Telangana',
+    center: [17.4065, 78.4772], // Tank Bund / Secretariat
+    zoom: 14,
+    demRangeM: [505, 545],
+    radarStation: 'IMD Hyderabad Begumpet Doppler',
+    primaryOutfall: 'Musi River Arterial Stormwater Sluices',
+    description: 'Rock terrain depression-trapped flash flood & Musi river catchment nowcasting system.',
+    searchKeywords: ['hyderabad', 'secunderabad', 'hussain sagar', 'tank bund', 'tolichowki', 'khairatabad'],
+  },
+  kochi: {
+    id: 'kochi',
+    name: 'Kochi',
+    regionName: 'Kochi Metropolitan Region',
+    basinName: 'Vembanad Backwaters & Marine Drive Basin',
+    state: 'Kerala',
+    center: [9.9723, 76.2783], // Marine Drive
+    zoom: 14,
+    demRangeM: [1, 8],
+    radarStation: 'IMD Kochi Naval Doppler (DWR)',
+    primaryOutfall: 'Vembanad Lake Estuary / Arabian Sea',
+    description: 'Backwater tidal surge & coastal monsoon inundation early warning nowcasting engine.',
+    searchKeywords: ['kochi', 'cochin', 'ernakulam', 'marine drive', 'fort kochi', 'kadavanthra'],
   },
 };
 
@@ -938,8 +1002,681 @@ export const METRO_DATASETS: Record<MetroCity, MetroDataset> = {
         address: 'Kuberan Nagar Community Hall, Madipakkam, Chennai, Tamil Nadu 600091',
         phone: '+91 44 2561 9214',
         capacity: 1000,
+        source: 'GCC Zone 13 Relief Center Register',
+        verification_status: 'verified',
+        last_verified: '2026-03-01',
       },
     ],
+  },
+
+  // ==========================================
+  // BENGALURU BASIN (BELLANDUR & ORR CORRIDOR)
+  // ==========================================
+  bengaluru: {
+    streets: [
+      {
+        coordinates: [
+          [77.6710, 12.9320],
+          [77.6742, 12.9352],
+          [77.6790, 12.9380],
+        ],
+        properties: {
+          segmentId: 'blr_seg_1',
+          streetName: 'Outer Ring Road (EcoSpace Tech Park Underpass)',
+          elevationM: 874.5,
+          slopePct: 0.4,
+          imperviousnessPct: 95,
+          catchmentAreaHa: 8.5,
+          nearestDrainNodeId: 'blr_node_1',
+        },
+      },
+      {
+        coordinates: [
+          [77.6742, 12.9352],
+          [77.6680, 12.9410],
+        ],
+        properties: {
+          segmentId: 'blr_seg_2',
+          streetName: 'Bellandur Lake Inflow Channel Road',
+          elevationM: 871.2,
+          slopePct: 0.3,
+          imperviousnessPct: 92,
+          catchmentAreaHa: 12.0,
+          nearestDrainNodeId: 'blr_node_2',
+        },
+      },
+      {
+        coordinates: [
+          [77.6200, 12.9150],
+          [77.6234, 12.9176],
+          [77.6280, 12.9210],
+        ],
+        properties: {
+          segmentId: 'blr_seg_3',
+          streetName: 'Central Silk Board Junction Flyover Base',
+          elevationM: 876.8,
+          slopePct: 0.6,
+          imperviousnessPct: 96,
+          catchmentAreaHa: 9.8,
+          nearestDrainNodeId: 'blr_node_3',
+        },
+      },
+    ],
+    drainageNodes: [
+      {
+        nodeId: 'blr_node_1',
+        nodeName: 'Bellandur Lake Storm Surplus Weirs',
+        type: 'inlet',
+        coordinates: [77.6742, 12.9352],
+        groundElevationM: 871.2,
+        invertElevationM: 868.0,
+        designCapacityLps: 650,
+        inflowLps: 780,
+        capacityUtilization: 120,
+        status: 'surcharging',
+        backflowLps: 130,
+        upstreamPipes: [],
+        downstreamPipes: ['blr_pipe_1'],
+      },
+      {
+        nodeId: 'blr_node_2',
+        nodeName: 'EcoSpace SWD Trunk Sump',
+        type: 'manhole',
+        coordinates: [77.6835, 12.9265],
+        groundElevationM: 874.5,
+        invertElevationM: 871.5,
+        designCapacityLps: 500,
+        inflowLps: 450,
+        capacityUtilization: 90,
+        status: 'congested',
+        backflowLps: 0,
+        upstreamPipes: ['blr_pipe_1'],
+        downstreamPipes: ['blr_pipe_2'],
+      },
+      {
+        nodeId: 'blr_node_3',
+        nodeName: 'Varthur Valley Canal Outfall',
+        type: 'outfall',
+        coordinates: [77.7120, 12.9420],
+        groundElevationM: 865.0,
+        invertElevationM: 862.0,
+        designCapacityLps: 1200,
+        inflowLps: 920,
+        capacityUtilization: 76,
+        status: 'normal',
+        backflowLps: 0,
+        upstreamPipes: ['blr_pipe_2'],
+        downstreamPipes: [],
+      },
+    ],
+    drainageEdges: [
+      {
+        pipeId: 'blr_pipe_1',
+        fromNode: 'blr_node_1',
+        toNode: 'blr_node_2',
+        diameterMm: 1800,
+        lengthM: 950,
+        slopePct: 0.35,
+        hydraulicCapacityLps: 700,
+        currentFlowLps: 780,
+        utilizationPct: 111,
+        isChoked: true,
+        coordinates: [
+          [77.6742, 12.9352],
+          [77.6790, 12.9380],
+        ],
+      },
+      {
+        pipeId: 'blr_pipe_2',
+        fromNode: 'blr_node_2',
+        toNode: 'blr_node_3',
+        diameterMm: 2200,
+        lengthM: 1400,
+        slopePct: 0.65,
+        hydraulicCapacityLps: 1300,
+        currentFlowLps: 920,
+        utilizationPct: 71,
+        isChoked: false,
+        coordinates: [
+          [77.6790, 12.9380],
+          [77.6830, 12.9410],
+        ],
+      },
+    ],
+    routes: [
+      {
+        coordinates: [
+          [77.6710, 12.9320],
+          [77.6742, 12.9352],
+          [77.6790, 12.9380],
+        ],
+        properties: {
+          type: 'primary',
+          status: 'inundated',
+          distanceKm: 2.1,
+          estimatedTimeMins: 14,
+          message: 'Critical Inundation: Outer Ring Road EcoSpace Underpass submerged',
+          maxFloodDepthCm: 32,
+          elevationGainM: 0.8,
+        },
+      },
+      {
+        coordinates: [
+          [77.6710, 12.9320],
+          [77.6590, 12.9450],
+          [77.6790, 12.9380],
+        ],
+        properties: {
+          type: 'alternate',
+          status: 'safe',
+          distanceKm: 3.4,
+          estimatedTimeMins: 12,
+          message: 'Flood-Safe Alternative: Elevated HAL Old Airport Road corridor',
+          maxFloodDepthCm: 3,
+          elevationGainM: 8.5,
+        },
+      },
+    ],
+    emergencyServices: VERIFIED_METRO_EMERGENCY_FACILITIES.bengaluru.map((s) => {
+      const dist = calculateHaversineDistance(12.9352, 77.6742, s.latitude, s.longitude);
+      return {
+        ...s,
+        distanceMeters: dist,
+        distanceFormatted: formatDistance(dist),
+        travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+      };
+    }),
+  },
+
+  // ==========================================
+  // KOLKATA BASIN (COLLEGE STREET & HOOGHLY)
+  // ==========================================
+  kolkata: {
+    streets: [
+      {
+        coordinates: [
+          [88.3580, 22.5710],
+          [88.3615, 22.5742],
+          [88.3660, 22.5770],
+        ],
+        properties: {
+          segmentId: 'kol_seg_1',
+          streetName: 'College Street (Book Market Section)',
+          elevationM: 4.2,
+          slopePct: 0.2,
+          imperviousnessPct: 96,
+          catchmentAreaHa: 6.2,
+          nearestDrainNodeId: 'kol_node_1',
+        },
+      },
+      {
+        coordinates: [
+          [88.3615, 22.5742],
+          [88.3672, 22.5812],
+        ],
+        properties: {
+          segmentId: 'kol_seg_2',
+          streetName: 'Thanthania Kalibari Junction (Amherst Street)',
+          elevationM: 3.8,
+          slopePct: 0.1,
+          imperviousnessPct: 94,
+          catchmentAreaHa: 8.4,
+          nearestDrainNodeId: 'kol_node_2',
+        },
+      },
+    ],
+    drainageNodes: [
+      {
+        nodeId: 'kol_node_1',
+        nodeName: 'Palmer Bridge Pumping Station Sump',
+        type: 'inlet',
+        coordinates: [88.3780, 22.5650],
+        groundElevationM: 4.2,
+        invertElevationM: 1.0,
+        designCapacityLps: 800,
+        inflowLps: 950,
+        capacityUtilization: 118,
+        status: 'surcharging',
+        backflowLps: 150,
+        upstreamPipes: [],
+        downstreamPipes: ['kol_pipe_1'],
+      },
+      {
+        nodeId: 'kol_node_2',
+        nodeName: 'Thanthania Siphon Intake Box',
+        type: 'manhole',
+        coordinates: [88.3672, 22.5812],
+        groundElevationM: 3.8,
+        invertElevationM: 1.2,
+        designCapacityLps: 450,
+        inflowLps: 520,
+        capacityUtilization: 115,
+        status: 'surcharging',
+        backflowLps: 70,
+        upstreamPipes: ['kol_pipe_1'],
+        downstreamPipes: ['kol_pipe_2'],
+      },
+      {
+        nodeId: 'kol_node_3',
+        nodeName: 'Circular Canal Outfall',
+        type: 'outfall',
+        coordinates: [88.3890, 22.5920],
+        groundElevationM: 3.0,
+        invertElevationM: 0.5,
+        designCapacityLps: 1400,
+        inflowLps: 1100,
+        capacityUtilization: 78,
+        status: 'normal',
+        backflowLps: 0,
+        upstreamPipes: ['kol_pipe_2'],
+        downstreamPipes: [],
+      },
+    ],
+    drainageEdges: [
+      {
+        pipeId: 'kol_pipe_1',
+        fromNode: 'kol_node_1',
+        toNode: 'kol_node_2',
+        diameterMm: 1600,
+        lengthM: 850,
+        slopePct: 0.25,
+        hydraulicCapacityLps: 600,
+        currentFlowLps: 750,
+        utilizationPct: 125,
+        isChoked: true,
+        coordinates: [
+          [88.3685, 22.5802],
+          [88.3740, 22.5830],
+        ],
+      },
+      {
+        pipeId: 'kol_pipe_2',
+        fromNode: 'kol_node_2',
+        toNode: 'kol_node_3',
+        diameterMm: 2000,
+        lengthM: 1200,
+        slopePct: 0.45,
+        hydraulicCapacityLps: 1200,
+        currentFlowLps: 980,
+        utilizationPct: 82,
+        isChoked: false,
+        coordinates: [
+          [88.3740, 22.5830],
+          [88.3888, 22.5930],
+        ],
+      },
+    ],
+    routes: [
+      {
+        coordinates: [
+          [88.3580, 22.5710],
+          [88.3615, 22.5742],
+          [88.3660, 22.5770],
+        ],
+        properties: {
+          type: 'primary',
+          status: 'inundated',
+          distanceKm: 1.8,
+          estimatedTimeMins: 16,
+          message: 'Waterlogged: College Street Book Market corridor submerged',
+          maxFloodDepthCm: 38,
+          elevationGainM: 0.4,
+        },
+      },
+      {
+        coordinates: [
+          [88.3580, 22.5710],
+          [88.3720, 22.5680],
+          [88.3660, 22.5770],
+        ],
+        properties: {
+          type: 'alternate',
+          status: 'safe',
+          distanceKm: 2.6,
+          estimatedTimeMins: 11,
+          message: 'Safe Alternative: Elevated AJC Bose Road bypass corridor',
+          maxFloodDepthCm: 4,
+          elevationGainM: 4.8,
+        },
+      },
+    ],
+    emergencyServices: VERIFIED_METRO_EMERGENCY_FACILITIES.kolkata.map((s) => {
+      const dist = calculateHaversineDistance(22.5726, 88.3639, s.latitude, s.longitude);
+      return {
+        ...s,
+        distanceMeters: dist,
+        distanceFormatted: formatDistance(dist),
+        travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+      };
+    }),
+  },
+
+  // ==========================================
+  // HYDERABAD BASIN (MUSI RIVER & HUSSAIN SAGAR)
+  // ==========================================
+  hyderabad: {
+    streets: [
+      {
+        coordinates: [
+          [78.4080, 17.3950],
+          [78.4124, 17.3985],
+          [78.4170, 17.4020],
+        ],
+        properties: {
+          segmentId: 'hyd_seg_1',
+          streetName: 'Tolichowki Low Arterial (Nadeem Colony Link)',
+          elevationM: 512.0,
+          slopePct: 0.4,
+          imperviousnessPct: 92,
+          catchmentAreaHa: 7.5,
+          nearestDrainNodeId: 'hyd_node_1',
+        },
+      },
+      {
+        coordinates: [
+          [78.4730, 17.4030],
+          [78.4772, 17.4065],
+          [78.4820, 17.4100],
+        ],
+        properties: {
+          segmentId: 'hyd_seg_2',
+          streetName: 'Lower Tank Bund Sluice Road',
+          elevationM: 509.2,
+          slopePct: 0.3,
+          imperviousnessPct: 96,
+          catchmentAreaHa: 9.0,
+          nearestDrainNodeId: 'hyd_node_2',
+        },
+      },
+    ],
+    drainageNodes: [
+      {
+        nodeId: 'hyd_node_1',
+        nodeName: 'Tolichowki Box Drain Sump',
+        type: 'inlet',
+        coordinates: [78.4124, 17.3985],
+        groundElevationM: 512.0,
+        invertElevationM: 509.0,
+        designCapacityLps: 480,
+        inflowLps: 620,
+        capacityUtilization: 129,
+        status: 'surcharging',
+        backflowLps: 140,
+        upstreamPipes: [],
+        downstreamPipes: ['hyd_pipe_1'],
+      },
+      {
+        nodeId: 'hyd_node_2',
+        nodeName: 'Hussain Sagar Surplus Spillway Sump',
+        type: 'manhole',
+        coordinates: [78.4772, 17.4065],
+        groundElevationM: 509.2,
+        invertElevationM: 506.5,
+        designCapacityLps: 750,
+        inflowLps: 810,
+        capacityUtilization: 108,
+        status: 'surcharging',
+        backflowLps: 60,
+        upstreamPipes: ['hyd_pipe_1'],
+        downstreamPipes: ['hyd_pipe_2'],
+      },
+      {
+        nodeId: 'hyd_node_3',
+        nodeName: 'Musi River Amberpet Sluice Outfall',
+        type: 'outfall',
+        coordinates: [78.5120, 17.3850],
+        groundElevationM: 498.0,
+        invertElevationM: 495.0,
+        designCapacityLps: 1500,
+        inflowLps: 1250,
+        capacityUtilization: 83,
+        status: 'normal',
+        backflowLps: 0,
+        upstreamPipes: ['hyd_pipe_2'],
+        downstreamPipes: [],
+      },
+    ],
+    drainageEdges: [
+      {
+        pipeId: 'hyd_pipe_1',
+        fromNode: 'hyd_node_1',
+        toNode: 'hyd_node_2',
+        diameterMm: 1800,
+        lengthM: 900,
+        slopePct: 0.45,
+        hydraulicCapacityLps: 650,
+        currentFlowLps: 780,
+        utilizationPct: 120,
+        isChoked: true,
+        coordinates: [
+          [78.4140, 17.3995],
+          [78.4200, 17.4040],
+        ],
+      },
+      {
+        pipeId: 'hyd_pipe_2',
+        fromNode: 'hyd_node_2',
+        toNode: 'hyd_node_3',
+        diameterMm: 2400,
+        lengthM: 1600,
+        slopePct: 0.75,
+        hydraulicCapacityLps: 1600,
+        currentFlowLps: 1250,
+        utilizationPct: 78,
+        isChoked: false,
+        coordinates: [
+          [78.4200, 17.4040],
+          [78.4875, 17.3792],
+        ],
+      },
+    ],
+    routes: [
+      {
+        coordinates: [
+          [78.4080, 17.3950],
+          [78.4124, 17.3985],
+          [78.4170, 17.4020],
+        ],
+        properties: {
+          type: 'primary',
+          status: 'inundated',
+          distanceKm: 2.2,
+          estimatedTimeMins: 15,
+          message: 'Inundation Warning: Tolichowki low-lying residential artery inundated',
+          maxFloodDepthCm: 34,
+          elevationGainM: 1.1,
+        },
+      },
+      {
+        coordinates: [
+          [78.4080, 17.3950],
+          [78.3980, 17.4082],
+          [78.4170, 17.4020],
+        ],
+        properties: {
+          type: 'alternate',
+          status: 'safe',
+          distanceKm: 3.5,
+          estimatedTimeMins: 10,
+          message: 'Safe Alternative: Elevated Shaikpet Flyover bypass corridor',
+          maxFloodDepthCm: 2,
+          elevationGainM: 12.4,
+        },
+      },
+    ],
+    emergencyServices: VERIFIED_METRO_EMERGENCY_FACILITIES.hyderabad.map((s) => {
+      const dist = calculateHaversineDistance(17.4065, 78.4772, s.latitude, s.longitude);
+      return {
+        ...s,
+        distanceMeters: dist,
+        distanceFormatted: formatDistance(dist),
+        travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+      };
+    }),
+  },
+
+  // ==========================================
+  // KOCHI BASIN (MARINE DRIVE & VEMBANAD)
+  // ==========================================
+  kochi: {
+    streets: [
+      {
+        coordinates: [
+          [76.2750, 9.9700],
+          [76.2783, 9.9723],
+          [76.2820, 9.9750],
+        ],
+        properties: {
+          segmentId: 'koc_seg_1',
+          streetName: 'Marine Drive Waterfront Arterial',
+          elevationM: 2.1,
+          slopePct: 0.2,
+          imperviousnessPct: 94,
+          catchmentAreaHa: 4.8,
+          nearestDrainNodeId: 'koc_node_1',
+        },
+      },
+      {
+        coordinates: [
+          [76.2840, 9.9690],
+          [76.2890, 9.9715],
+          [76.2920, 9.9740],
+        ],
+        properties: {
+          segmentId: 'koc_seg_2',
+          streetName: 'KSRTC Bus Stand Low Basin (Ernakulam)',
+          elevationM: 1.8,
+          slopePct: 0.1,
+          imperviousnessPct: 95,
+          catchmentAreaHa: 6.2,
+          nearestDrainNodeId: 'koc_node_2',
+        },
+      },
+    ],
+    drainageNodes: [
+      {
+        nodeId: 'koc_node_1',
+        nodeName: 'Mullassery Canal Tidal Sluice Inlet',
+        type: 'inlet',
+        coordinates: [76.2783, 9.9723],
+        groundElevationM: 2.1,
+        invertElevationM: 0.5,
+        designCapacityLps: 550,
+        inflowLps: 680,
+        capacityUtilization: 123,
+        status: 'surcharging',
+        backflowLps: 130,
+        upstreamPipes: [],
+        downstreamPipes: ['koc_pipe_1'],
+      },
+      {
+        nodeId: 'koc_node_2',
+        nodeName: 'Perandoor Canal Interceptor Sump',
+        type: 'manhole',
+        coordinates: [76.2890, 9.9715],
+        groundElevationM: 1.8,
+        invertElevationM: 0.6,
+        designCapacityLps: 420,
+        inflowLps: 490,
+        capacityUtilization: 116,
+        status: 'surcharging',
+        backflowLps: 70,
+        upstreamPipes: ['koc_pipe_1'],
+        downstreamPipes: ['koc_pipe_2'],
+      },
+      {
+        nodeId: 'koc_node_3',
+        nodeName: 'Vembanad Backwater Flap Gate Outfall',
+        type: 'outfall',
+        coordinates: [76.2680, 9.9650],
+        groundElevationM: 1.2,
+        invertElevationM: 0.2,
+        designCapacityLps: 1100,
+        inflowLps: 880,
+        capacityUtilization: 80,
+        status: 'normal',
+        backflowLps: 0,
+        upstreamPipes: ['koc_pipe_2'],
+        downstreamPipes: [],
+      },
+    ],
+    drainageEdges: [
+      {
+        pipeId: 'koc_pipe_1',
+        fromNode: 'koc_node_1',
+        toNode: 'koc_node_2',
+        diameterMm: 1600,
+        lengthM: 750,
+        slopePct: 0.2,
+        hydraulicCapacityLps: 580,
+        currentFlowLps: 710,
+        utilizationPct: 122,
+        isChoked: true,
+        coordinates: [
+          [76.2872, 9.9723],
+          [76.2828, 9.9691],
+        ],
+      },
+      {
+        pipeId: 'koc_pipe_2',
+        fromNode: 'koc_node_2',
+        toNode: 'koc_node_3',
+        diameterMm: 1800,
+        lengthM: 850,
+        slopePct: 0.35,
+        hydraulicCapacityLps: 980,
+        currentFlowLps: 880,
+        utilizationPct: 90,
+        isChoked: false,
+        coordinates: [
+          [76.2828, 9.9691],
+          [76.2750, 9.9816],
+        ],
+      },
+    ],
+    routes: [
+      {
+        coordinates: [
+          [76.2840, 9.9690],
+          [76.2890, 9.9715],
+          [76.2920, 9.9740],
+        ],
+        properties: {
+          type: 'primary',
+          status: 'inundated',
+          distanceKm: 1.6,
+          estimatedTimeMins: 14,
+          message: 'Coastal Surcharge: KSRTC low-lying terminal submerged',
+          maxFloodDepthCm: 36,
+          elevationGainM: 0.3,
+        },
+      },
+      {
+        coordinates: [
+          [76.2840, 9.9690],
+          [76.2820, 9.9800],
+          [76.2920, 9.9740],
+        ],
+        properties: {
+          type: 'alternate',
+          status: 'safe',
+          distanceKm: 2.8,
+          estimatedTimeMins: 9,
+          message: 'Safe Alternative: Elevated North Overbridge / MG Road bypass',
+          maxFloodDepthCm: 2,
+          elevationGainM: 6.2,
+        },
+      },
+    ],
+    emergencyServices: VERIFIED_METRO_EMERGENCY_FACILITIES.kochi.map((s) => {
+      const dist = calculateHaversineDistance(9.9723, 76.2783, s.latitude, s.longitude);
+      return {
+        ...s,
+        distanceMeters: dist,
+        distanceFormatted: formatDistance(dist),
+        travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+      };
+    }),
   },
 };
 

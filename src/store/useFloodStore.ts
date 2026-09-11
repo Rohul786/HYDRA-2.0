@@ -21,6 +21,7 @@ import {
   MunicipalAlert,
   ContinuousUpdateCycle,
   ForecastReliabilityMetric,
+  LocationMode,
 } from '../types';
 import type { FeatureCollection } from 'geojson';
 import { calculateHaversineDistance, formatDistance, calculateEstimatedTravelTime } from '@/utils/geoDistance';
@@ -60,9 +61,12 @@ export interface WeatherSummary {
 }
 
 interface FloodState {
-  // Metro Selection
+  // Metro Selection & Location Mode
   activeMetro: MetroCity;
   setActiveMetro: (metro: MetroCity) => void;
+  locationMode: LocationMode;
+  setLocationMode: (mode: LocationMode) => void;
+  switchToGps: () => void;
 
   // Real-time Doppler Radar & Hydraulic Parameters
   rainfallIntensity: number; // mm/hr (0 - 120)
@@ -196,6 +200,12 @@ export const useFloodStore = create<FloodState>((set, get) => {
   const initialUpdate = evaluateUpdateCycle(initialIntensity, 65, 'OBSERVE');
 
   return {
+    locationMode: 'metro',
+    setLocationMode: (locationMode) => set({ locationMode }),
+    switchToGps: () => {
+      set({ locationMode: 'gps' });
+    },
+
     activeMetro: initialMetro,
     setActiveMetro: (metro) => {
       const config = METRO_CONFIGS[metro];
@@ -213,12 +223,22 @@ export const useFloodStore = create<FloodState>((set, get) => {
       const hotspots = getWaterloggingHotspots(metro, get().rainfallIntensity);
 
       set({
+        locationMode: 'metro',
         activeMetro: metro,
         mapCenterTarget: config.center,
         selectedFeature: null,
         activeNavigationDestination: null,
         nearestMunicipality: muni,
         waterloggingHotspots: hotspots,
+        userLocation: {
+          latitude: config.center[0],
+          longitude: config.center[1],
+          accuracy: null,
+          loading: false,
+          error: null,
+          permissionState: get().userLocation.permissionState,
+          isRealGps: false,
+        },
         nearbyServices: {
           hospitals: metroServices.filter((s) => s.type === 'hospital').sort((a, b) => a.distanceMeters - b.distanceMeters),
           policeStations: metroServices.filter((s) => s.type === 'police').sort((a, b) => a.distanceMeters - b.distanceMeters),
@@ -481,6 +501,7 @@ export const useFloodStore = create<FloodState>((set, get) => {
         nearestMunicipality,
       } = get();
       const cfg = METRO_CONFIGS[activeMetro];
+      const eventId = `HYDRA-EVENT-${activeMetro.toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-4)}`;
 
       const alert = await dispatchMunicipalAlert({
         location: `${cfg.name} (${cfg.basinName})`,
@@ -497,6 +518,8 @@ export const useFloodStore = create<FloodState>((set, get) => {
         estimatedLeadTimeMins: 45,
         channels,
         recipientAuthorityName: nearestMunicipality.name,
+        eventId,
+        nearestOfficeName: nearestMunicipality.officeName,
       });
 
       set((state) => ({

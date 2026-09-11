@@ -7,6 +7,8 @@ import { getNearbyEmergencyServices } from '@/utils/emergencyServices';
 export function useUserLocation() {
   const {
     userLocation,
+    locationMode,
+    switchToGps,
     setUserLocation,
     setNearbyServices,
     evaluateSafetyStatus,
@@ -44,7 +46,7 @@ export function useUserLocation() {
   );
 
   // Trigger browser geolocation
-  const requestLocation = useCallback(() => {
+  const requestLocation = useCallback((forceGpsMode = true) => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       setUserLocation({
         loading: false,
@@ -52,6 +54,10 @@ export function useUserLocation() {
         permissionState: 'unavailable',
       });
       return;
+    }
+
+    if (forceGpsMode) {
+      switchToGps();
     }
 
     setUserLocation({ loading: true, error: null });
@@ -67,6 +73,17 @@ export function useUserLocation() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const accuracy = position.coords.accuracy;
+
+        // Check active mode from Zustand store
+        const currentMode = useFloodStore.getState().locationMode;
+        if (!forceGpsMode && currentMode !== 'gps') {
+          // User has selected a metro city — do NOT override with GPS
+          setUserLocation({
+            loading: false,
+            permissionState: 'granted',
+          });
+          return;
+        }
 
         setUserLocation({
           latitude: lat,
@@ -91,6 +108,12 @@ export function useUserLocation() {
 
         watchIdRef.current = navigator.geolocation.watchPosition(
           (pos) => {
+            // CRITICAL: Prevent silent override if user is in 'metro' mode
+            const modeNow = useFloodStore.getState().locationMode;
+            if (modeNow !== 'gps') {
+              return;
+            }
+
             const nextLat = pos.coords.latitude;
             const nextLng = pos.coords.longitude;
             setUserLocation({
@@ -134,13 +157,13 @@ export function useUserLocation() {
       },
       options
     );
-  }, [setUserLocation, setMapCenterTarget, updateLocationContext, evaluateSafetyStatus, userLocation.latitude, userLocation.longitude]);
+  }, [switchToGps, setUserLocation, setMapCenterTarget, updateLocationContext, evaluateSafetyStatus, userLocation.latitude, userLocation.longitude]);
 
-  // Automatically detect location when the user opens the app
+  // Automatically check permission state when the user opens the app without overriding metro mode
   useEffect(() => {
     if (!initialLoadDoneRef.current) {
       initialLoadDoneRef.current = true;
-      requestLocation();
+      requestLocation(false);
     }
   }, [requestLocation]);
 

@@ -12,6 +12,7 @@ export default function EmergencyMarkers() {
     layerVisibility,
     nearbyServices,
     userLocation,
+    nearestMunicipality,
     setActiveNavigationDestination,
     setMapCenterTarget,
   } = useFloodStore();
@@ -177,6 +178,78 @@ export default function EmergencyMarkers() {
             {renderServicePopup(shelter, 'SHELTER')}
           </Marker>
         ))}
+
+      {/* 🏛️ Nearest Municipal Authority & Ward Control Room Marker */}
+      {nearestMunicipality.officeCoords && (
+        <Marker
+          position={nearestMunicipality.officeCoords}
+          icon={
+            L.divIcon({
+              className: 'bg-transparent',
+              html: `
+                <div class="relative flex items-center justify-center cursor-pointer transform transition-transform hover:scale-110">
+                  <div class="w-8 h-8 bg-purple-700 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-sm">
+                    <span>🏛️</span>
+                  </div>
+                  <div class="absolute -bottom-1 w-2 h-2 bg-purple-700 transform rotate-45"></div>
+                </div>
+              `,
+              iconSize: [32, 36],
+              iconAnchor: [16, 36],
+              popupAnchor: [0, -32],
+            })
+          }
+        >
+          <Popup className="emergency-service-popup rounded-2xl shadow-xl">
+            <div className="p-2 min-w-[240px] max-w-[290px]">
+              <div className="flex items-center justify-between pb-1 border-b border-gray-100 mb-2">
+                <span className="text-[11px] font-bold tracking-wider text-purple-700 uppercase">
+                  🏛️ Municipal Authority
+                </span>
+                <span className="text-[9px] bg-purple-50 text-purple-700 font-extrabold px-1.5 py-0.5 rounded border border-purple-200">
+                  {nearestMunicipality.shortCode || 'MUNICIPAL'}
+                </span>
+              </div>
+
+              <h4 className="text-xs font-black text-gray-900 leading-tight mb-1">
+                {nearestMunicipality.officeName || nearestMunicipality.name}
+              </h4>
+
+              <div className="text-[11px] text-blue-700 font-semibold mb-1.5">
+                ~{nearestMunicipality.distanceKm} km away • {nearestMunicipality.controlRoomName}
+              </div>
+
+              {nearestMunicipality.officeAddress && (
+                <p className="text-[11px] text-gray-600 mb-2 leading-relaxed bg-gray-50 p-1.5 rounded-lg border border-gray-100">
+                  {nearestMunicipality.officeAddress}
+                </p>
+              )}
+
+              <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${nearestMunicipality.officeCoords[0]},${nearestMunicipality.officeCoords[1]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold py-1.5 px-2 rounded-lg transition-colors shadow-2xs"
+                >
+                  <Navigation className="w-3 h-3" />
+                  <span>Directions</span>
+                </a>
+
+                {nearestMunicipality.emergencyPhone && (
+                  <a
+                    href={`tel:${nearestMunicipality.emergencyPhone.replace(/[^0-9+]/g, '')}`}
+                    className="flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-2.5 rounded-lg transition-colors shadow-2xs"
+                  >
+                    <Phone className="w-3 h-3" />
+                    <span>Call</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      )}
     </>
   );
 }
