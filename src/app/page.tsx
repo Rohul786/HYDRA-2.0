@@ -5,6 +5,7 @@ import EmergencyServicesPanel from '@/components/ui/EmergencyServicesPanel';
 import RouteInspector from '@/components/ui/RouteInspector';
 import InspectorModal from '@/components/ui/InspectorModal';
 import HazardDetailModal from '@/components/ui/HazardDetailModal';
+import GlobalSearchTicker from '@/components/ui/GlobalSearchTicker';
 
 export default function Home() {
   return (
@@ -12,7 +13,10 @@ export default function Home() {
       {/* Interactive Map (Preserved & Extended with GPS, Services, Hazards, Navigation) */}
       <FloodMap />
 
-      {/* Environmental Live Conditions (Preserved) */}
+      {/* Worldwide Place Search & Live Global Alert Ticker (New) */}
+      <GlobalSearchTicker />
+
+      {/* Environmental Live Conditions (Preserved & Reactive to Location) */}
       <WeatherPill />
 
       {/* User GPS Geolocation & Live Safety Assessment (New) */}

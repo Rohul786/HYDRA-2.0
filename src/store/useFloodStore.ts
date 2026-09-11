@@ -11,6 +11,7 @@ import {
 import { MOCK_HAZARDS } from '@/data/mockHazards';
 import { calculateHaversineDistance, formatDistance, calculateEstimatedTravelTime } from '@/utils/geoDistance';
 import { DEFAULT_MOCK_SERVICES } from '@/data/mockEmergencyServices';
+import { PRE_SEEDED_GLOBAL_HAZARDS } from '@/utils/globalHazards';
 
 export type ExtendedLayerKey = 'streets' | 'drainage' | 'hospitals' | 'police' | 'fire' | 'shelters';
 
@@ -23,6 +24,14 @@ const INITIAL_SERVICES = DEFAULT_MOCK_SERVICES.map((s) => {
     travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
   };
 });
+
+export interface WeatherSummary {
+  temp: number;
+  precipitation: number;
+  windSpeed: number;
+  condition: string;
+  alert?: string;
+}
 
 interface FloodState {
   // Existing state preserved 100%
@@ -44,11 +53,11 @@ interface FloodState {
   toggleLayerVisibility: (layer: ExtendedLayerKey) => void;
   toggleHazardLayer: (hazard: HazardType) => void;
 
-  // New Geolocation State
+  // Geolocation State
   userLocation: UserLocationState;
   setUserLocation: (location: Partial<UserLocationState>) => void;
 
-  // New Nearby Emergency Services
+  // Nearby Emergency Services
   nearbyServices: NearbyEmergencyServices;
   setNearbyServices: (services: Partial<NearbyEmergencyServices>) => void;
 
@@ -60,6 +69,19 @@ interface FloodState {
   selectedHazard: HazardItem | null;
   setSelectedHazard: (hazard: HazardItem | null) => void;
 
+  // Global Multi-Disaster Hazards (USGS + Global Meteorological feeds)
+  globalHazards: HazardItem[];
+  setGlobalHazards: (hazards: HazardItem[]) => void;
+  addGlobalHazards: (newHazards: HazardItem[]) => void;
+
+  // Dynamic Weather
+  currentWeather: WeatherSummary;
+  setCurrentWeather: (w: WeatherSummary) => void;
+
+  // Active Place Searched (Worldwide)
+  activePlaceName: string;
+  setActivePlaceName: (name: string) => void;
+
   // Live Safety Status
   safetyStatus: UserSafetyStatus;
   evaluateSafetyStatus: (lat: number, lng: number) => void;
@@ -69,7 +91,7 @@ interface FloodState {
   setMapCenterTarget: (target: [number, number] | null) => void;
 }
 
-export const useFloodStore = create<FloodState>((set) => ({
+export const useFloodStore = create<FloodState>((set, get) => ({
   selectedTimeWindow: '0h',
   activeRoute: 'both',
   selectedFeature: null,
@@ -81,15 +103,15 @@ export const useFloodStore = create<FloodState>((set) => ({
     fire: true,
     shelters: true,
     hazards: {
-      flood: true, // Keep flood enabled by default as required
+      flood: true,
       cyclone: true,
-      earthquake: false,
-      landslide: false,
-      wildfire: false,
-      tsunami: false,
+      earthquake: true,
+      landslide: true,
+      wildfire: true,
+      tsunami: true,
       severe_storm: true,
       extreme_rainfall: true,
-      heatwave: false,
+      heatwave: true,
     },
   },
   setTimeWindow: (window) => set({ selectedTimeWindow: window }),
@@ -158,7 +180,31 @@ export const useFloodStore = create<FloodState>((set) => ({
   selectedHazard: null,
   setSelectedHazard: (hazard) => set({ selectedHazard: hazard }),
 
-  // Safety status for default BKC coordinate (inside BKC flash flood zone)
+  // Global hazards feed
+  globalHazards: PRE_SEEDED_GLOBAL_HAZARDS,
+  setGlobalHazards: (hazards) => set({ globalHazards: hazards }),
+  addGlobalHazards: (newHazards) =>
+    set((state) => {
+      const existingIds = new Set(state.globalHazards.map((h) => h.id));
+      const filtered = newHazards.filter((h) => !existingIds.has(h.id));
+      return { globalHazards: [...state.globalHazards, ...filtered] };
+    }),
+
+  // Live weather
+  currentWeather: {
+    temp: 28,
+    precipitation: 42,
+    windSpeed: 14,
+    condition: 'Heavy Rain',
+    alert: 'Critical Alert: Backflow detected at BKC Drainage Node 1',
+  },
+  setCurrentWeather: (currentWeather) => set({ currentWeather }),
+
+  // Active searched place
+  activePlaceName: 'Bandra Kurla Complex, Mumbai',
+  setActivePlaceName: (activePlaceName) => set({ activePlaceName }),
+
+  // Safety status for active coordinates
   safetyStatus: {
     level: 'danger',
     title: 'DANGER',
@@ -168,8 +214,10 @@ export const useFloodStore = create<FloodState>((set) => ({
   },
 
   evaluateSafetyStatus: (lat: number, lng: number) => {
-    // Check intersection with all mock hazards
-    const intersectingHazards = MOCK_HAZARDS.filter((hazard) => {
+    const allKnownHazards = [...MOCK_HAZARDS, ...get().globalHazards];
+
+    // Check intersection with all active hazards
+    const intersectingHazards = allKnownHazards.filter((hazard) => {
       const dist = calculateHaversineDistance(lat, lng, hazard.latitude, hazard.longitude);
       return dist <= hazard.radius;
     });
@@ -186,7 +234,6 @@ export const useFloodStore = create<FloodState>((set) => ({
       return;
     }
 
-    // Check highest severity
     const hasDanger = intersectingHazards.some(
       (h) => h.severity === 'critical' || h.severity === 'high'
     );

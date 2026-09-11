@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useFloodStore } from '@/store/useFloodStore';
 import { getNearbyEmergencyServices } from '@/utils/emergencyServices';
+import { fetchGlobalEarthquakes, fetchLiveWeatherHazards } from '@/utils/globalHazards';
 
 export function useUserLocation() {
   const {
@@ -11,16 +12,35 @@ export function useUserLocation() {
     setNearbyServices,
     evaluateSafetyStatus,
     setMapCenterTarget,
+    addGlobalHazards,
+    setCurrentWeather,
   } = useFloodStore();
 
   const watchIdRef = useRef<number | null>(null);
   const initialLoadDoneRef = useRef(false);
 
-  // Update services and safety for a given coordinate pair
+  // Update services, live weather, and safety for a given coordinate pair anywhere in the world
   const updateLocationContext = useCallback(
-    async (lat: number, lng: number) => {
+    async (lat: number, lng: number, placeLabel = 'Your Location') => {
       evaluateSafetyStatus(lat, lng);
 
+      // 1. Fetch live meteorological conditions from Open-Meteo
+      fetchLiveWeatherHazards(lat, lng, placeLabel).then(({ weather, dynamicHazards }) => {
+        setCurrentWeather({
+          temp: weather.temp,
+          precipitation: weather.precipitation,
+          windSpeed: weather.windSpeed,
+          condition: weather.condition,
+          alert: dynamicHazards.length > 0 ? dynamicHazards[0].name : undefined,
+        });
+
+        if (dynamicHazards.length > 0) {
+          addGlobalHazards(dynamicHazards);
+        }
+        evaluateSafetyStatus(lat, lng);
+      });
+
+      // 2. Fetch nearby emergency services from OpenStreetMap Overpass
       setNearbyServices({ loading: true, error: null });
       try {
         const services = await getNearbyEmergencyServices(lat, lng);
@@ -39,7 +59,7 @@ export function useUserLocation() {
         });
       }
     },
-    [evaluateSafetyStatus, setNearbyServices]
+    [evaluateSafetyStatus, setNearbyServices, setCurrentWeather, addGlobalHazards]
   );
 
   // Trigger browser geolocation
@@ -57,7 +77,7 @@ export function useUserLocation() {
 
     const options: PositionOptions = {
       enableHighAccuracy: true,
-      timeout: 12000,
+      timeout: 10000,
       maximumAge: 0,
     };
 
@@ -80,10 +100,10 @@ export function useUserLocation() {
         // Center map on user's real location
         setMapCenterTarget([lat, lng]);
 
-        // Update emergency services & safety status
-        updateLocationContext(lat, lng);
+        // Update emergency services, live weather & safety status
+        updateLocationContext(lat, lng, 'Your Location');
 
-        // Optionally subscribe to watchPosition for live tracking
+        // Subscribe to watchPosition for live position updates
         if (watchIdRef.current !== null) {
           navigator.geolocation.clearWatch(watchIdRef.current);
         }
@@ -101,7 +121,7 @@ export function useUserLocation() {
             evaluateSafetyStatus(nextLat, nextLng);
           },
           (err) => {
-            console.warn('Geolocation watchPosition update warning:', err.message);
+            console.warn('Geolocation watchPosition notice:', err.message);
           },
           { enableHighAccuracy: true, maximumAge: 5000 }
         );
@@ -126,20 +146,32 @@ export function useUserLocation() {
           error: message,
           permissionState: permission,
         });
+
+        // If GPS is denied or unavailable, ensure default location context is fully loaded
+        const fallbackLat = userLocation.latitude ?? 19.0596;
+        const fallbackLng = userLocation.longitude ?? 72.8626;
+        updateLocationContext(fallbackLat, fallbackLng, 'Default Hub');
       },
       options
     );
-  }, [setUserLocation, setMapCenterTarget, updateLocationContext, evaluateSafetyStatus]);
+  }, [setUserLocation, setMapCenterTarget, updateLocationContext, evaluateSafetyStatus, userLocation.latitude, userLocation.longitude]);
 
-  // Load initial services & safety for default location on first mount
+  // Automatically detect location when the user opens the app!
   useEffect(() => {
     if (!initialLoadDoneRef.current) {
       initialLoadDoneRef.current = true;
-      const initialLat = userLocation.latitude ?? 19.0596;
-      const initialLng = userLocation.longitude ?? 72.8626;
-      updateLocationContext(initialLat, initialLng);
+
+      // Automatically request user location right away
+      requestLocation();
+
+      // Fetch live real-time USGS earthquakes worldwide
+      fetchGlobalEarthquakes().then((quakes) => {
+        if (quakes.length > 0) {
+          addGlobalHazards(quakes);
+        }
+      });
     }
-  }, [userLocation.latitude, userLocation.longitude, updateLocationContext]);
+  }, [requestLocation, addGlobalHazards]);
 
   // Cleanup watch on unmount
   useEffect(() => {
@@ -159,5 +191,6 @@ export function useUserLocation() {
     permissionState: userLocation.permissionState,
     isRealGps: userLocation.isRealGps,
     requestLocation,
+    updateLocationContext,
   };
 }

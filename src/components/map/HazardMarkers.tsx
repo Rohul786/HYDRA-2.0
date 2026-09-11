@@ -16,7 +16,7 @@ const SEVERITY_COLORS: Record<HazardSeverity, { stroke: string; fill: string; ba
 };
 
 export default function HazardMarkers() {
-  const { layerVisibility, setSelectedHazard } = useFloodStore();
+  const { layerVisibility, setSelectedHazard, globalHazards } = useFloodStore();
 
   const createHazardIcon = (hazard: HazardItem) => {
     const config = HAZARD_CONFIG[hazard.type];
@@ -43,8 +43,9 @@ export default function HazardMarkers() {
   };
 
   const activeHazards = useMemo(() => {
-    return MOCK_HAZARDS.filter((hazard) => layerVisibility.hazards[hazard.type]);
-  }, [layerVisibility.hazards]);
+    const combined = [...MOCK_HAZARDS, ...globalHazards];
+    return combined.filter((hazard) => layerVisibility.hazards[hazard.type]);
+  }, [layerVisibility.hazards, globalHazards]);
 
   return (
     <>
