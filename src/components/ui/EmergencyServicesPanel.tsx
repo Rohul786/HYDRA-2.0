@@ -84,7 +84,7 @@ export default function EmergencyServicesPanel() {
   ];
 
   return (
-    <div className="absolute top-[345px] left-6 z-10 bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-4 max-w-sm w-80 flex flex-col gap-3 max-h-[calc(100vh-370px)] overflow-y-auto">
+    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-4 max-w-sm w-80 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-gray-100">
         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">

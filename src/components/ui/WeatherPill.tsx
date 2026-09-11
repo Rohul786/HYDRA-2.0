@@ -9,7 +9,7 @@ export default function WeatherPill() {
   const alertMessage = currentWeather.alert || 'Backflow detected at BKC Drainage Node 1';
 
   return (
-    <div className="absolute top-6 left-6 z-10 bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-4 max-w-sm flex flex-col gap-2.5">
+    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-4 max-w-sm w-80 flex flex-col gap-2.5">
       {/* Location tag */}
       <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">
         {activePlaceName || 'Live Weather Conditions'}

@@ -62,7 +62,7 @@ export default function LocationSafetyCard() {
   const badge = getSafetyBadge();
 
   return (
-    <div className="absolute top-36 left-6 z-10 bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-4 max-w-sm w-80 flex flex-col gap-3">
+    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-4 max-w-sm w-80 flex flex-col gap-3">
       {/* Geolocation Trigger & Status Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
