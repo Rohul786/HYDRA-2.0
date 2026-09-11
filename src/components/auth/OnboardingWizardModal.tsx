@@ -156,12 +156,12 @@ export default function OnboardingWizardModal() {
         {/* Step Indicator Header */}
         <div className="p-5 pb-3 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-2xl overflow-hidden shadow-sm border border-white shrink-0 bg-white">
+            <div className="relative w-11 h-11 rounded-full overflow-hidden shadow-sm border-2 border-white shrink-0 bg-white">
               <Image
                 src="/logo.png"
                 alt="HYDRA Logo"
-                width={40}
-                height={40}
+                width={44}
+                height={44}
                 className="w-full h-full object-contain"
               />
             </div>

@@ -28,12 +28,12 @@ export default function GoogleLoginScreen() {
       <div className="relative z-10 w-full max-w-md bg-slate-900/80 backdrop-blur-2xl border border-slate-700/60 rounded-3xl p-8 shadow-2xl space-y-6 text-center animate-in zoom-in-95 duration-200">
         {/* HYDRA Logo & Branding */}
         <div className="flex flex-col items-center space-y-3">
-          <div className="relative w-20 h-20 rounded-3xl overflow-hidden shadow-xl shadow-blue-500/20 border-2 border-blue-500/30 p-2 bg-slate-800/80">
+          <div className="relative w-24 h-24 rounded-full overflow-hidden shadow-2xl shadow-blue-500/30 border-2 border-blue-500/40 p-1 bg-slate-900/60">
             <Image
               src="/logo.png"
               alt="HYDRA Logo"
-              width={80}
-              height={80}
+              width={96}
+              height={96}
               className="w-full h-full object-contain"
               priority
             />

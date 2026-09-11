@@ -29,7 +29,7 @@ export default function SafetyDisclaimerModal() {
         {/* Header */}
         <div className="p-5 pb-4 border-b border-gray-100 bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-white flex items-center justify-between gap-3.5">
           <div className="flex items-center gap-3.5">
-            <div className="relative w-12 h-12 rounded-2xl overflow-hidden shadow-md border-2 border-white shrink-0">
+            <div className="relative w-12 h-12 rounded-full overflow-hidden shadow-md border-2 border-white shrink-0">
               <Image
                 src="/logo.png"
                 alt="HYDRA Logo"
