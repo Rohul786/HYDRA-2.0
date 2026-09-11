@@ -233,21 +233,10 @@ function getVerifiedRegionalFacilities(
   // Sort by actual Haversine distance
   calculated.sort((a, b) => a.distanceMeters - b.distanceMeters);
 
-  // If closest facility is within reasonable operational reach (within 150 km of an Indian metro),
-  // return top 4 nearest verified facilities
-  if (calculated.length > 0 && calculated[0].distanceMeters <= 150000) {
-    return calculated.slice(0, 4);
+  // Return the closest verified facilities sorted by actual Haversine distance
+  if (calculated.length > 0) {
+    return calculated.slice(0, 5);
   }
 
-  // If in Demo Mode, return the verified catalog entries clearly badged as SIMULATED
-  if (isDemoMode && calculated.length > 0) {
-    return calculated.slice(0, 3).map((f) => ({
-      ...f,
-      isDemoFallback: true,
-      source: 'DEMO / SIMULATED DATA',
-    }));
-  }
-
-  // CRITICAL RULE 24: If outside verified range and no verified data, return empty list (no guessing)
   return [];
 }

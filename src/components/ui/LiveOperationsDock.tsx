@@ -54,6 +54,9 @@ export default function LiveOperationsDock() {
     isCalculatingRoute,
     openDisclaimerModal,
     isDemoMode,
+    userLocation,
+    locationMode,
+    openLocationPermissionModal,
   } = useFloodStore();
 
   const { latitude, longitude } = useUserLocation();
@@ -61,6 +64,8 @@ export default function LiveOperationsDock() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<'status' | 'municipal' | 'emergency'>('status');
   const [serviceFilter, setServiceFilter] = useState<'all' | EmergencyServiceType>('all');
+
+  const isGpsActive = locationMode === 'gps' && userLocation.isRealGps;
 
   // Periodic health check and weather synchronization with backend
   useEffect(() => {
@@ -440,6 +445,37 @@ export default function LiveOperationsDock() {
             {/* TAB 3: NEARBY EMERGENCY SERVICES (REAL VERIFIED ADDRESSES) */}
             {activeTab === 'emergency' && (
               <>
+                {/* Proximity Heading & Location Context */}
+                <div className="bg-gradient-to-r from-blue-50/70 to-slate-50 p-2.5 rounded-2xl border border-blue-100/90 flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-black text-gray-900 flex items-center gap-1.5">
+                      <span>🚨 Rescue Facilities Near You</span>
+                      {isGpsActive ? (
+                        <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-md">
+                          GPS Live
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded-md">
+                          {config.name} Basin
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      {isGpsActive
+                        ? 'Sorted by exact driving distance from your current GPS coordinates'
+                        : `Sorted by distance from active ${config.name} basin coordinates`}
+                    </div>
+                  </div>
+                  {!isGpsActive && (
+                    <button
+                      onClick={() => openLocationPermissionModal()}
+                      className="text-[10px] font-bold text-blue-700 bg-white hover:bg-blue-100 px-2 py-1 rounded-xl border border-blue-200 transition-colors shrink-0 cursor-pointer shadow-2xs"
+                    >
+                      Use GPS
+                    </button>
+                  )}
+                </div>
+
                 {/* Filter Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
                   {[

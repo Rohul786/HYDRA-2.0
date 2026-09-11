@@ -16,60 +16,8 @@ import {
   X,
   Building2,
   Radio,
-  SlidersHorizontal,
+  AlertCircle,
 } from 'lucide-react';
-
-export const PRESET_ZONES: Record<string, Array<{ name: string; lat: number; lng: number }>> = {
-  mumbai: [
-    { name: 'Bandra Kurla Complex (BKC)', lat: 19.0626, lng: 72.8626 },
-    { name: 'Dadar TT / Hindmata', lat: 19.0178, lng: 72.8478 },
-    { name: 'Santacruz / Milan Subway', lat: 19.0833, lng: 72.8428 },
-    { name: 'Kurla West (Mithi Basin)', lat: 19.0726, lng: 72.8796 },
-    { name: 'Andheri West (Veera Desai)', lat: 19.1352, lng: 72.8315 },
-  ],
-  delhi: [
-    { name: 'Connaught Place (Inner Circle)', lat: 28.6328, lng: 77.2197 },
-    { name: 'Minto Road Railway Bridge', lat: 28.6416, lng: 77.2258 },
-    { name: 'ITO Junction / Vikas Marg', lat: 28.6304, lng: 77.2435 },
-    { name: 'Pul Prahladpur Underpass', lat: 28.5115, lng: 77.2942 },
-    { name: 'Kashmere Gate ISBT', lat: 28.6675, lng: 77.2285 },
-  ],
-  chennai: [
-    { name: 'Velachery 100 Feet Road', lat: 12.9785, lng: 80.2185 },
-    { name: 'Madipakkam Lake Margin', lat: 12.9642, lng: 80.1989 },
-    { name: 'T. Nagar (Usman Road)', lat: 13.0418, lng: 80.2341 },
-    { name: 'Saidapet / Adyar Riverbank', lat: 13.0213, lng: 80.2231 },
-    { name: 'Vyasarpadi Jeeva Subway', lat: 13.1124, lng: 80.2589 },
-  ],
-  bengaluru: [
-    { name: 'Silk Board Junction & ORR', lat: 12.9176, lng: 77.6233 },
-    { name: 'Bellandur EcoSpace Corridor', lat: 12.9260, lng: 77.6844 },
-    { name: 'Hebbal Flyover Underpass', lat: 13.0358, lng: 77.5970 },
-    { name: 'Koramangala 4th Block', lat: 12.9352, lng: 77.6245 },
-    { name: 'Whitefield Hope Farm Junction', lat: 12.9830, lng: 77.7510 },
-  ],
-  kolkata: [
-    { name: 'College Street / Thanthania', lat: 22.5802, lng: 88.3685 },
-    { name: 'Park Circus 7-Point Crossing', lat: 22.5448, lng: 88.3667 },
-    { name: 'Ultadanga VIP Road Connector', lat: 22.5930, lng: 88.3888 },
-    { name: 'Sector V Salt Lake', lat: 22.5735, lng: 88.4331 },
-    { name: 'Kalighat SP Mukherjee Road', lat: 22.5186, lng: 88.3478 },
-  ],
-  hyderabad: [
-    { name: 'Tolichowki & Al Jubail Colony', lat: 17.3995, lng: 78.4140 },
-    { name: 'Begumpet Prakash Nagar Culvert', lat: 17.4447, lng: 78.4682 },
-    { name: 'Hitec City Cyber Towers', lat: 17.4504, lng: 78.3808 },
-    { name: 'Chaderghat Musi Riverbank', lat: 17.3792, lng: 78.4875 },
-    { name: 'Nadeem Colony (Golconda)', lat: 17.3872, lng: 78.4010 },
-  ],
-  kochi: [
-    { name: 'KSRTC Bus Terminal Karikkamuri', lat: 9.9723, lng: 76.2872 },
-    { name: 'MG Road Jos Junction Corridor', lat: 9.9691, lng: 76.2828 },
-    { name: 'Ernakulam South Railway Station', lat: 9.9678, lng: 76.2912 },
-    { name: 'Marine Drive Foreshore', lat: 9.9816, lng: 76.2750 },
-    { name: 'Aluva Periyar Riverbank', lat: 10.1076, lng: 76.3516 },
-  ],
-};
 
 const ALL_METRO_CITIES: Array<{
   id: MetroCity;
@@ -135,17 +83,14 @@ export default function LocationController() {
     setActiveMetro,
     locationMode,
     userLocation,
-    setUserLocation,
     setMapCenterTarget,
-    evaluateSafetyStatus,
+    openLocationPermissionModal,
   } = useFloodStore();
 
   const { loading: gpsLoading, requestLocation } = useUserLocation();
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showZonesDropdown, setShowZonesDropdown] = useState(false);
 
-  const zones = PRESET_ZONES[activeMetro] || PRESET_ZONES.mumbai;
   const cfg = METRO_CONFIGS[activeMetro];
 
   // Filtered metro list based on real-time search
@@ -162,13 +107,6 @@ export default function LocationController() {
     });
   }, [searchQuery]);
 
-  // Filtered preset zones for current search
-  const filteredZones = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return zones;
-    return zones.filter((z) => z.name.toLowerCase().includes(q));
-  }, [zones, searchQuery]);
-
   // Handler for manual metro selection
   const handleSelectMetro = (metroId: MetroCity) => {
     setActiveMetro(metroId);
@@ -181,19 +119,6 @@ export default function LocationController() {
     requestLocation(true);
     setModalOpen(false);
     setSearchQuery('');
-  };
-
-  // Handler for preset zone click
-  const handleSelectPreset = (zone: { name: string; lat: number; lng: number }) => {
-    setUserLocation({
-      latitude: zone.lat,
-      longitude: zone.lng,
-      isRealGps: false,
-    });
-    setMapCenterTarget([zone.lat, zone.lng]);
-    evaluateSafetyStatus(zone.lat, zone.lng);
-    setShowZonesDropdown(false);
-    setModalOpen(false);
   };
 
   const centerOnUser = () => {
@@ -281,43 +206,35 @@ export default function LocationController() {
         </span>
       </div>
 
-      {/* 3. Preset Hotspot Zones Quick Switcher */}
-      <div className="relative pt-0.5">
-        <button
-          onClick={() => setShowZonesDropdown(!showZonesDropdown)}
-          className="w-full py-1.5 px-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold flex items-center justify-between text-[11px] border border-gray-200 transition-colors cursor-pointer"
-        >
-          <span className="flex items-center gap-1.5 truncate">
-            <SlidersHorizontal className="w-3 h-3 text-gray-500 shrink-0" />
-            <span className="truncate">Preset Zones ({zones.length} in {cfg.name})</span>
-          </span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${
-              showZonesDropdown ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
-
-        {showZonesDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-2xl shadow-xl border border-gray-200 py-1.5 z-30 max-h-48 overflow-y-auto">
-            {zones.map((zone, idx) => {
-              const isSelected =
-                userLocation.latitude?.toFixed(4) === zone.lat.toFixed(4) &&
-                userLocation.longitude?.toFixed(4) === zone.lng.toFixed(4);
-
-              return (
-                <button
-                  key={idx}
-                  onClick={() => handleSelectPreset(zone)}
-                  className={`w-full text-left px-3 py-1.5 text-[11px] font-medium flex items-center justify-between hover:bg-blue-50 transition-colors cursor-pointer ${
-                    isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'
-                  }`}
-                >
-                  <span className="truncate">{zone.name}</span>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 shrink-0 ml-1" />}
-                </button>
-              );
-            })}
+      {/* 3. Location Detection & GPS Permission Action */}
+      <div className="pt-0.5">
+        {!isGpsActive ? (
+          <button
+            onClick={() => openLocationPermissionModal()}
+            className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-100/80 text-blue-700 font-bold flex items-center justify-between text-[11px] border border-blue-200/90 transition-all cursor-pointer shadow-2xs group"
+          >
+            <span className="flex items-center gap-2 truncate">
+              <Crosshair className="w-3.5 h-3.5 text-blue-600 shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="truncate">Allow &amp; Detect Current Location</span>
+            </span>
+            <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg shadow-2xs shrink-0">
+              Detect
+            </span>
+          </button>
+        ) : (
+          <div className="w-full py-1.5 px-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-bold flex items-center justify-between text-[11px] border border-emerald-200">
+            <span className="flex items-center gap-1.5 truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="truncate">Live GPS Tracking Active</span>
+            </span>
+            <button
+              onClick={() => requestLocation(true)}
+              disabled={gpsLoading}
+              className="text-[10px] text-emerald-700 hover:text-emerald-900 font-extrabold bg-white px-2 py-0.5 rounded-md border border-emerald-200 hover:bg-emerald-100/60 transition-colors cursor-pointer"
+              title="Recalibrate browser GPS coordinates"
+            >
+              {gpsLoading ? 'Syncing...' : 'Recalibrate'}
+            </button>
           </div>
         )}
       </div>
@@ -407,12 +324,19 @@ export default function LocationController() {
                         )}
                       </div>
                       <div className="text-[11px] text-gray-500 mt-0.5">
-                        Acquires browser GPS coordinates & alerts nearest local ward
+                        Acquires browser GPS coordinates &amp; calculates nearby rescue
                       </div>
                     </div>
                   </div>
                   {isGpsActive && <Check className="w-4 h-4 text-blue-600 shrink-0 ml-2" />}
                 </button>
+
+                {userLocation.permissionState === 'denied' && (
+                  <div className="mt-1.5 p-2 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 flex items-start gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.2" />
+                    <span>Location access blocked in browser. Click the lock icon in your address bar to enable location.</span>
+                  </div>
+                )}
               </div>
 
               {/* Option 2: Supported Metro Basins */}
@@ -479,29 +403,6 @@ export default function LocationController() {
                   )}
                 </div>
               </div>
-
-              {/* Option 3: Preset Hotspot Zones in Active/Filtered Cities */}
-              {filteredZones.length > 0 && (
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 px-1">
-                    Preset Zones in {cfg.name} ({filteredZones.length})
-                  </div>
-                  <div className="grid grid-cols-1 gap-1">
-                    {filteredZones.map((zone, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSelectPreset(zone)}
-                        className="w-full text-left p-2 rounded-xl text-[11px] font-medium text-gray-700 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center justify-between border border-gray-100 cursor-pointer"
-                      >
-                        <span className="truncate">{zone.name}</span>
-                        <span className="text-[10px] text-gray-400 font-mono shrink-0 ml-2">
-                          [{zone.lat.toFixed(2)}, {zone.lng.toFixed(2)}]
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Modal Footer */}

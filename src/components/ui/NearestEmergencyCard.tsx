@@ -47,12 +47,21 @@ export default function NearestEmergencyCard() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="text-sm">🚨</span>
-          <h3 className="font-black text-xs text-gray-900 tracking-tight uppercase">
-            Nearest Police &amp; Hospital
-          </h3>
+          <div>
+            <h3 className="font-black text-xs text-gray-900 tracking-tight uppercase">
+              Nearest Police &amp; Hospital
+            </h3>
+            <div className="text-[10px] text-gray-500 font-medium">
+              {userLocation.isRealGps ? '📍 Near Your Current GPS Location' : '🏙️ Near Active Basin Coordinates'}
+            </div>
+          </div>
         </div>
-        <span className="text-[9px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
-          Location-Aware
+        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border ${
+          userLocation.isRealGps
+            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+            : 'text-blue-700 bg-blue-50 border-blue-100'
+        }`}>
+          {userLocation.isRealGps ? 'GPS Proximity' : 'Location-Aware'}
         </span>
       </div>
 

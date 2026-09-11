@@ -13,6 +13,7 @@ export function useUserLocation() {
     setNearbyServices,
     evaluateSafetyStatus,
     setMapCenterTarget,
+    openLocationPermissionModal,
   } = useFloodStore();
 
   const watchIdRef = useRef<number | null>(null);
@@ -159,13 +160,49 @@ export function useUserLocation() {
     );
   }, [switchToGps, setUserLocation, setMapCenterTarget, updateLocationContext, evaluateSafetyStatus, userLocation.latitude, userLocation.longitude]);
 
-  // Automatically check permission state when the user opens the app without overriding metro mode
+  // Check permission state without passively triggering browser location popup
   useEffect(() => {
-    if (!initialLoadDoneRef.current) {
-      initialLoadDoneRef.current = true;
-      requestLocation(false);
+    if (initialLoadDoneRef.current || typeof window === 'undefined') return;
+    initialLoadDoneRef.current = true;
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((permissionStatus) => {
+          if (permissionStatus.state === 'granted') {
+            // Already granted permission previously: can safely sync GPS position
+            requestLocation(false);
+          } else if (permissionStatus.state === 'prompt') {
+            // Permission has NOT been granted yet: check if prompt was handled in session
+            const alreadyPrompted = sessionStorage.getItem('hydra_location_prompt_handled');
+            if (!alreadyPrompted) {
+              openLocationPermissionModal();
+            }
+          } else if (permissionStatus.state === 'denied') {
+            setUserLocation({ permissionState: 'denied' });
+          }
+
+          permissionStatus.onchange = () => {
+            if (permissionStatus.state === 'granted') {
+              requestLocation(true);
+            } else if (permissionStatus.state === 'denied') {
+              setUserLocation({ permissionState: 'denied' });
+            }
+          };
+        })
+        .catch(() => {
+          const alreadyPrompted = sessionStorage.getItem('hydra_location_prompt_handled');
+          if (!alreadyPrompted) {
+            openLocationPermissionModal();
+          }
+        });
+    } else {
+      const alreadyPrompted = sessionStorage.getItem('hydra_location_prompt_handled');
+      if (!alreadyPrompted) {
+        openLocationPermissionModal();
+      }
     }
-  }, [requestLocation]);
+  }, [requestLocation, openLocationPermissionModal, setUserLocation]);
 
   // Cleanup watch on unmount
   useEffect(() => {

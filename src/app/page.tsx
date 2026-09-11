@@ -9,6 +9,7 @@ import SafetyDisclaimerModal from '@/components/ui/SafetyDisclaimerModal';
 import AlertSettingsModal from '@/components/ui/AlertSettingsModal';
 import AlertHistoryModal from '@/components/ui/AlertHistoryModal';
 import PhoneVerificationModal from '@/components/ui/PhoneVerificationModal';
+import LocationPermissionModal from '@/components/ui/LocationPermissionModal';
 
 export default function Home() {
   const { autoSyncGoogleSession } = useAuthStore();
@@ -42,6 +43,7 @@ export default function Home() {
 
       {/* 4. On-Demand Citizen Safety & Modals */}
       <SafetyDisclaimerModal />
+      <LocationPermissionModal />
       <AlertSettingsModal />
       <AlertHistoryModal />
       <PhoneVerificationModal />

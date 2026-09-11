@@ -26,6 +26,7 @@ import {
 import type { FeatureCollection } from 'geojson';
 import { calculateHaversineDistance, formatDistance, calculateEstimatedTravelTime } from '@/utils/geoDistance';
 import { METRO_CONFIGS, METRO_DATASETS, getMetroGeoJSON } from '@/data/metroFloodData';
+import { VERIFIED_METRO_EMERGENCY_FACILITIES } from '@/data/mockEmergencyServices';
 import {
   checkBackendHealth,
   fetchSafeRoute,
@@ -155,6 +156,11 @@ interface FloodState {
   disclaimerModalOpen: boolean;
   openDisclaimerModal: () => void;
   closeDisclaimerModal: () => void;
+
+  // Location Permission Modal State
+  locationPermissionModalOpen: boolean;
+  openLocationPermissionModal: () => void;
+  closeLocationPermissionModal: () => void;
 
   // Unified Hydrological Recalculation
   recalculateHydrologicalRisk: () => void;
@@ -322,32 +328,49 @@ export const useFloodStore = create<FloodState>((set, get) => {
       const current = get().userLocation;
       if (current.latitude && current.longitude) {
         const muni = getNearestMunicipalAuthority(current.latitude, current.longitude);
-        const metroData = METRO_DATASETS[get().activeMetro];
-        if (metroData) {
-          const updatedServices = metroData.emergencyServices.map((s) => {
-            const dist = calculateHaversineDistance(current.latitude!, current.longitude!, s.latitude, s.longitude);
-            return {
+
+        // Dynamically compute exact distances to ALL verified facilities relative to current user coordinates
+        const allServices: EmergencyService[] = [];
+        Object.values(VERIFIED_METRO_EMERGENCY_FACILITIES).forEach((metroList) => {
+          metroList.forEach((s) => {
+            const dist = calculateHaversineDistance(
+              current.latitude!,
+              current.longitude!,
+              s.latitude,
+              s.longitude
+            );
+            allServices.push({
               ...s,
               distanceMeters: dist,
               distanceFormatted: formatDistance(dist),
               travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
-            };
+            });
           });
+        });
 
-          set({
-            nearestMunicipality: muni,
-            nearbyServices: {
-              hospitals: updatedServices.filter((s) => s.type === 'hospital').sort((a, b) => a.distanceMeters - b.distanceMeters),
-              policeStations: updatedServices.filter((s) => s.type === 'police').sort((a, b) => a.distanceMeters - b.distanceMeters),
-              fireStations: updatedServices.filter((s) => s.type === 'fire_station').sort((a, b) => a.distanceMeters - b.distanceMeters),
-              shelters: updatedServices.filter((s) => s.type === 'shelter').sort((a, b) => a.distanceMeters - b.distanceMeters),
-              loading: false,
-              error: null,
-            },
-          });
-        } else {
-          set({ nearestMunicipality: muni });
-        }
+        set({
+          nearestMunicipality: muni,
+          nearbyServices: {
+            hospitals: allServices
+              .filter((s) => s.type === 'hospital')
+              .sort((a, b) => a.distanceMeters - b.distanceMeters)
+              .slice(0, 6),
+            policeStations: allServices
+              .filter((s) => s.type === 'police')
+              .sort((a, b) => a.distanceMeters - b.distanceMeters)
+              .slice(0, 6),
+            fireStations: allServices
+              .filter((s) => s.type === 'fire_station')
+              .sort((a, b) => a.distanceMeters - b.distanceMeters)
+              .slice(0, 6),
+            shelters: allServices
+              .filter((s) => s.type === 'shelter')
+              .sort((a, b) => a.distanceMeters - b.distanceMeters)
+              .slice(0, 6),
+            loading: false,
+            error: null,
+          },
+        });
       }
     },
 
@@ -606,6 +629,10 @@ export const useFloodStore = create<FloodState>((set, get) => {
     disclaimerModalOpen: false,
     openDisclaimerModal: () => set({ disclaimerModalOpen: true }),
     closeDisclaimerModal: () => set({ disclaimerModalOpen: false }),
+
+    locationPermissionModalOpen: false,
+    openLocationPermissionModal: () => set({ locationPermissionModalOpen: true }),
+    closeLocationPermissionModal: () => set({ locationPermissionModalOpen: false }),
 
     // Unified Hydrological Recalculation across all coupled modules
     recalculateHydrologicalRisk: () => {
