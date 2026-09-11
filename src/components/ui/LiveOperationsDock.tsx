@@ -206,12 +206,6 @@ export default function LiveOperationsDock() {
               </div>
             </div>
 
-            {/* Simulated Data Watermark if in Demo Mode */}
-            {isDemoMode && (
-              <div className="mt-2 text-[10px] font-black uppercase text-purple-700 bg-purple-50 p-1.5 rounded-xl border border-purple-200 text-center tracking-wider animate-pulse">
-                ⚡ DEMO / SIMULATED DATA ACTIVE (SIH PROTOTYPE)
-              </div>
-            )}
 
             {/* Citizen Profile & Emergency Alert Channels */}
             <div className="mt-2.5 flex items-center justify-between">

@@ -13,11 +13,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
+  LogIn,
 } from 'lucide-react';
 
 export default function UserProfileMenu() {
   const {
     user,
+    isGoogleConnected,
+    loginWithGoogle,
     logout,
     openAlertSettings,
     openAlertHistory,
@@ -47,9 +50,9 @@ export default function UserProfileMenu() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-1.5 pr-3 rounded-2xl bg-white/90 hover:bg-white border border-slate-200/80 shadow-sm hover:shadow transition-all cursor-pointer text-left focus:outline-none"
+        className="flex items-center gap-2 p-1.5 pr-3 rounded-2xl bg-white/90 hover:bg-white border border-slate-200/80 shadow-xs hover:shadow transition-all cursor-pointer text-left focus:outline-none"
       >
-        <div className="relative w-8 h-8 rounded-xl overflow-hidden bg-blue-100 border border-blue-200 shrink-0 flex items-center justify-center">
+        <div className="relative w-8 h-8 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
           {user.avatarUrl ? (
             <Image
               src={user.avatarUrl}
@@ -59,22 +62,27 @@ export default function UserProfileMenu() {
               className="w-full h-full object-cover"
             />
           ) : (
-            <User className="w-4 h-4 text-blue-600" />
+            <User className="w-4 h-4 text-slate-600" />
           )}
         </div>
 
         <div className="flex flex-col text-left">
-          <div className="text-xs font-bold text-gray-900 leading-tight max-w-[110px] truncate">
+          <div className="text-xs font-bold text-gray-900 leading-tight max-w-[120px] truncate">
             {user.displayName}
           </div>
           <div className="flex items-center gap-1 text-[9px] font-mono">
-            {user.phoneVerified ? (
-              <span className="text-emerald-600 font-bold flex items-center gap-0.5">
-                <CheckCircle2 className="w-2.5 h-2.5" /> SMS Active
+            {isGoogleConnected ? (
+              <span className="text-blue-600 font-bold flex items-center gap-0.5">
+                Google Synced
               </span>
             ) : (
-              <span className="text-amber-600 font-bold flex items-center gap-0.5">
-                <AlertTriangle className="w-2.5 h-2.5" /> SMS Inactive
+              <span className="text-slate-500 font-bold flex items-center gap-0.5">
+                Guest Session
+              </span>
+            )}
+            {user.phoneVerified && (
+              <span className="text-emerald-600 font-bold ml-1 flex items-center gap-0.5">
+                • <CheckCircle2 className="w-2.5 h-2.5" /> SMS
               </span>
             )}
           </div>
@@ -85,15 +93,21 @@ export default function UserProfileMenu() {
 
       {/* Dropdown Card */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200/90 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-white/95 backdrop-blur-md shadow-2xl border border-slate-200/90 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
           {/* User Info Header */}
           <div className="px-4 py-2.5 border-b border-gray-100">
             <div className="font-black text-gray-900 text-xs truncate">
               {user.displayName}
             </div>
-            <div className="text-[11px] text-gray-500 truncate">
-              {user.email}
-            </div>
+            {user.email ? (
+              <div className="text-[11px] text-gray-500 truncate">
+                {user.email}
+              </div>
+            ) : (
+              <div className="text-[10px] text-gray-400 font-mono">
+                Anonymous / Guest User
+              </div>
+            )}
 
             {/* Phone Status Strip */}
             <div className="mt-2 p-2 rounded-xl bg-gray-50 border border-gray-200/80 flex items-center justify-between">
@@ -161,19 +175,33 @@ export default function UserProfileMenu() {
             </button>
           </div>
 
-          {/* Sign Out Button */}
+          {/* Google Connect / Disconnect Action */}
           <div className="pt-1 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                logout();
-              }}
-              className="w-full px-4 py-2 text-left text-xs text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
+            {isGoogleConnected ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  logout();
+                }}
+                className="w-full px-4 py-2 text-left text-xs text-rose-600 hover:bg-rose-50 font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Disconnect Google Account</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  loginWithGoogle();
+                }}
+                className="w-full px-4 py-2 text-left text-xs text-blue-600 hover:bg-blue-50 font-bold flex items-center gap-2.5 transition-colors cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Connect with Google</span>
+              </button>
+            )}
           </div>
         </div>
       )}

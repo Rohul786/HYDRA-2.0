@@ -21,18 +21,18 @@ const DEFAULT_PREFERENCES: UserAlertPreferences = {
   municipalAlerts: true,
 };
 
-const INITIAL_DEMO_USER: UserProfile = {
-  id: 'hydra-usr-001',
-  googleId: 'google-oauth2-1092837465',
-  displayName: 'Arjun Sharma',
-  email: 'arjun.sharma@hydra-disaster.gov.in',
-  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=128&h=128&fit=crop&crop=faces',
-  phone: '+91 98201 12345',
-  phoneVerified: true,
-  smsConsent: true,
-  pushConsent: true,
+export const DEFAULT_GUEST_USER: UserProfile = {
+  id: 'hydra-guest',
+  googleId: '',
+  displayName: 'Guest User',
+  email: '',
+  avatarUrl: '',
+  phone: '',
+  phoneVerified: false,
+  smsConsent: false,
+  pushConsent: false,
   locationPermission: 'granted',
-  createdAt: '2026-09-11T08:00:00Z',
+  createdAt: new Date().toISOString(),
 };
 
 const INITIAL_ALERT_HISTORY: UserAlertHistoryItem[] = [
@@ -73,9 +73,9 @@ const INITIAL_ALERT_HISTORY: UserAlertHistoryItem[] = [
 
 interface AuthState {
   isAuthenticated: boolean;
-  user: UserProfile | null;
+  user: UserProfile;
   sessionToken: string | null;
-  onboardingStep: OnboardingStep;
+  isGoogleConnected: boolean;
   alertPreferences: UserAlertPreferences;
   alertHistory: UserAlertHistoryItem[];
   isAlertSettingsOpen: boolean;
@@ -84,14 +84,14 @@ interface AuthState {
   isPhoneModalOpen: boolean;
 
   // Actions
-  loginWithGoogle: (demoName?: string, demoEmail?: string) => Promise<void>;
+  autoSyncGoogleSession: () => Promise<void>;
+  loginWithGoogle: (authData?: { name?: string; email?: string; avatarUrl?: string; token?: string }) => Promise<void>;
   logout: () => void;
   sendPhoneOtp: (phone: string) => Promise<{ success: boolean; message: string; demoHint?: string }>;
   verifyPhoneOtp: (phone: string, otp: string) => Promise<{ success: boolean; message: string }>;
   skipPhoneVerification: () => void;
   setLocationPermission: (status: 'granted' | 'manual') => void;
   setNotificationPermission: (granted: boolean) => void;
-  completeOnboarding: () => void;
   updateAlertPreferences: (prefs: Partial<UserAlertPreferences>) => void;
   recordAlert: (alert: UserAlertHistoryItem) => void;
   openAlertSettings: () => void;
@@ -105,32 +105,30 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
-  // Read persisted authentication and onboarding state from localStorage if available
-  let initialAuth = false;
-  let initialUser: UserProfile | null = null;
-  let initialStep: OnboardingStep = 'login';
+  // Initialize with persisted session if available, otherwise graceful Guest User
+  let initialUser: UserProfile = { ...DEFAULT_GUEST_USER };
+  let initialGoogleConnected = false;
 
   if (typeof window !== 'undefined') {
-    const savedToken = localStorage.getItem('hydra_session_token');
     const savedUser = localStorage.getItem('hydra_user_profile');
-    const onboardingDone = localStorage.getItem('hydra_onboarding_completed') === 'true';
-
-    if (savedToken && savedUser) {
+    if (savedUser) {
       try {
-        initialAuth = true;
-        initialUser = JSON.parse(savedUser);
-        initialStep = onboardingDone ? 'completed' : 'location';
+        const parsed = JSON.parse(savedUser);
+        if (parsed && parsed.displayName && parsed.displayName !== 'Arjun Sharma') {
+          initialUser = parsed;
+          initialGoogleConnected = Boolean(parsed.googleId || (parsed.email && parsed.email.endsWith('@gmail.com')));
+        }
       } catch {
-        // Corrupt storage reset
+        // Fallback to guest
       }
     }
   }
 
   return {
-    isAuthenticated: initialAuth,
+    isAuthenticated: true, // Always enter directly into dashboard
     user: initialUser,
-    sessionToken: null,
-    onboardingStep: initialStep,
+    sessionToken: typeof window !== 'undefined' ? localStorage.getItem('hydra_session_token') : null,
+    isGoogleConnected: initialGoogleConnected,
     alertPreferences: DEFAULT_PREFERENCES,
     alertHistory: INITIAL_ALERT_HISTORY,
     isAlertSettingsOpen: false,
@@ -138,17 +136,73 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isDisclaimerOpen: false,
     isPhoneModalOpen: false,
 
-    loginWithGoogle: async (demoName, demoEmail) => {
-      // 1. Attempt backend Google OAuth
-      let userProfile = { ...INITIAL_DEMO_USER };
-      if (demoName) userProfile.displayName = demoName;
-      if (demoEmail) userProfile.email = demoEmail;
+    autoSyncGoogleSession: async () => {
+      // 1. Check if backend has an active authenticated Google session
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Accept: 'application/json' },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authenticated && data.user) {
+            const syncedUser: UserProfile = {
+              id: data.user.id || 'hydra-usr-sync',
+              googleId: data.user.google_id || data.user.id,
+              displayName: data.user.display_name || 'Google User',
+              email: data.user.email || '',
+              avatarUrl: data.user.avatar_url || '',
+              phone: data.user.phone || '',
+              phoneVerified: Boolean(data.user.phone_verified),
+              smsConsent: true,
+              pushConsent: true,
+              locationPermission: 'granted',
+              createdAt: data.user.created_at || new Date().toISOString(),
+            };
+
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('hydra_user_profile', JSON.stringify(syncedUser));
+              localStorage.setItem('hydra_session_token', 'hydra_sess_active');
+            }
+
+            set({
+              user: syncedUser,
+              isGoogleConnected: true,
+              sessionToken: 'hydra_sess_active',
+            });
+            return;
+          }
+        }
+      } catch {
+        // Backend offline or unreachable — keep graceful guest state
+      }
+
+      // 2. If no active session, ensure user is set to Guest User (no hardcoded names)
+      if (!get().isGoogleConnected) {
+        set({
+          user: DEFAULT_GUEST_USER,
+          isGoogleConnected: false,
+        });
+      }
+    },
+
+    loginWithGoogle: async (authData) => {
+      let userProfile: UserProfile = {
+        ...DEFAULT_GUEST_USER,
+        id: `hydra-usr-${Date.now().toString().slice(-6)}`,
+        displayName: authData?.name || 'Google User',
+        email: authData?.email || '',
+        avatarUrl: authData?.avatarUrl || '',
+      };
 
       try {
         const res = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ is_demo: true, name: demoName, email: demoEmail }),
+          body: JSON.stringify({
+            token: authData?.token,
+            name: authData?.name,
+            email: authData?.email,
+          }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -165,7 +219,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           }
         }
       } catch {
-        // Fallback to local userProfile
+        // Use local userProfile
       }
 
       if (typeof window !== 'undefined') {
@@ -173,16 +227,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
         localStorage.setItem('hydra_user_profile', JSON.stringify(userProfile));
       }
 
-      // Check if user has already completed onboarding previously
-      const alreadyCompleted =
-        typeof window !== 'undefined' &&
-        localStorage.getItem('hydra_onboarding_completed') === 'true';
-
       set({
-        isAuthenticated: true,
         user: userProfile,
+        isGoogleConnected: true,
         sessionToken: 'hydra_sess_active',
-        onboardingStep: alreadyCompleted ? 'completed' : 'location',
       });
     },
 
@@ -190,13 +238,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('hydra_session_token');
         localStorage.removeItem('hydra_user_profile');
-        localStorage.removeItem('hydra_onboarding_completed');
       }
+      // Gracefully switch to Guest User
       set({
-        isAuthenticated: false,
-        user: null,
+        user: DEFAULT_GUEST_USER,
+        isGoogleConnected: false,
         sessionToken: null,
-        onboardingStep: 'login',
       });
     },
 
@@ -236,16 +283,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
           const data = await res.json();
           if (data.verified) {
             set((state) => {
-              const updatedUser = state.user
-                ? { ...state.user, phone, phoneVerified: true, smsConsent: true }
-                : null;
-              if (typeof window !== 'undefined' && updatedUser) {
+              const updatedUser: UserProfile = {
+                ...state.user,
+                phone,
+                phoneVerified: true,
+                smsConsent: true,
+              };
+              if (typeof window !== 'undefined') {
                 localStorage.setItem('hydra_user_profile', JSON.stringify(updatedUser));
               }
-              return {
-                user: updatedUser,
-                onboardingStep: 'notification',
-              };
+              return { user: updatedUser };
             });
             return { success: true, message: 'Phone number verified' };
           }
@@ -256,16 +303,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
       if (otp === '123456') {
         set((state) => {
-          const updatedUser = state.user
-            ? { ...state.user, phone, phoneVerified: true, smsConsent: true }
-            : null;
-          if (typeof window !== 'undefined' && updatedUser) {
+          const updatedUser: UserProfile = {
+            ...state.user,
+            phone,
+            phoneVerified: true,
+            smsConsent: true,
+          };
+          if (typeof window !== 'undefined') {
             localStorage.setItem('hydra_user_profile', JSON.stringify(updatedUser));
           }
-          return {
-            user: updatedUser,
-            onboardingStep: 'notification',
-          };
+          return { user: updatedUser };
         });
         return { success: true, message: 'Phone number verified (Demo Mode)' };
       }
@@ -274,45 +321,27 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     skipPhoneVerification: () => {
-      set({ onboardingStep: 'notification' });
+      // Nothing needed
     },
 
     setLocationPermission: (permStatus) => {
       set((state) => {
-        const updated = state.user
-          ? { ...state.user, locationPermission: permStatus }
-          : null;
-        if (typeof window !== 'undefined' && updated) {
+        const updated: UserProfile = { ...state.user, locationPermission: permStatus };
+        if (typeof window !== 'undefined') {
           localStorage.setItem('hydra_user_profile', JSON.stringify(updated));
         }
-        return {
-          user: updated,
-          onboardingStep: 'phone',
-        };
+        return { user: updated };
       });
     },
 
     setNotificationPermission: (granted) => {
       set((state) => {
-        const updated = state.user
-          ? { ...state.user, pushConsent: granted }
-          : null;
-        if (typeof window !== 'undefined' && updated) {
+        const updated: UserProfile = { ...state.user, pushConsent: granted };
+        if (typeof window !== 'undefined') {
           localStorage.setItem('hydra_user_profile', JSON.stringify(updated));
         }
-        return {
-          user: updated,
-          onboardingStep: 'disclaimer',
-        };
+        return { user: updated };
       });
-    },
-
-    completeOnboarding: () => {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hydra_onboarding_completed', 'true');
-        localStorage.setItem('hydra_disclaimer_accepted', 'true');
-      }
-      set({ onboardingStep: 'completed' });
     },
 
     updateAlertPreferences: (prefs) => {
