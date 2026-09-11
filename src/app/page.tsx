@@ -1,8 +1,5 @@
 import FloodMap from '@/components/map/FloodMap';
-import HeaderBranding from '@/components/ui/HeaderBranding';
-import WeatherPill from '@/components/ui/WeatherPill';
-import LocationSafetyCard from '@/components/ui/LocationSafetyCard';
-import EmergencyServicesPanel from '@/components/ui/EmergencyServicesPanel';
+import LiveOperationsDock from '@/components/ui/LiveOperationsDock';
 import RouteInspector from '@/components/ui/RouteInspector';
 import InspectorModal from '@/components/ui/InspectorModal';
 import MetroRadarBar from '@/components/ui/MetroRadarBar';
@@ -18,20 +15,8 @@ export default function Home() {
         <MetroRadarBar />
       </div>
 
-      {/* Left Control Column: Branding, Live Weather, GPS Flood Safety, Nearby Evacuation Hubs */}
-      <div className="absolute top-6 left-6 z-10 flex flex-col gap-3.5 max-h-[calc(100vh-48px)] overflow-y-auto pr-1">
-        {/* App Title & Subtitle Branding with Circular Multi-Disaster Logo */}
-        <HeaderBranding />
-
-        {/* Environmental & Doppler Radar Conditions */}
-        <WeatherPill />
-
-        {/* User GPS Geolocation & Live Street Flood Safety Assessment */}
-        <LocationSafetyCard />
-
-        {/* Nearby Emergency Shelters & Flood Relief Facilities */}
-        <EmergencyServicesPanel />
-      </div>
+      {/* Left Mission Control: Collapsible Live Operations Dock (Branding, GPS, Telemetry & Real Emergency Facilities) */}
+      <LiveOperationsDock />
 
       {/* Predictive Nowcast Horizon, Hydraulic Layers & Flood-Safe Navigation */}
       <RouteInspector />

@@ -10,8 +10,11 @@ import {
   CheckCircle2,
   Layers,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Shield,
   Droplets,
+  Route,
 } from 'lucide-react';
 import { METRO_CONFIGS } from '@/data/metroFloodData';
 import { LeadTimeWindow } from '@/types';
@@ -28,7 +31,8 @@ export default function RouteInspector() {
     toggleLayerVisibility,
   } = useFloodStore();
 
-  const [emergencyLayersOpen, setEmergencyLayersOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [emergencyLayersOpen, setEmergencyLayersOpen] = useState(true);
 
   const timeWindows: LeadTimeWindow[] = ['0h', '1h', '2h', '3h'];
   const activeConfig = METRO_CONFIGS[activeMetro];
@@ -57,28 +61,73 @@ export default function RouteInspector() {
 
   const currentRouteInfo = routeOrigins[activeMetro] || routeOrigins.mumbai;
 
+  if (isCollapsed) {
+    return (
+      <div className="absolute top-6 right-6 z-20">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200/80 p-3 flex items-center gap-2.5 hover:scale-105 transition-all cursor-pointer group pointer-events-auto"
+          title="Expand GIS Layers & Route Inspector"
+        >
+          <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div className="text-left hidden sm:block">
+            <div className="text-xs font-black text-gray-900">GIS &amp; Routes</div>
+            <div className="text-[10px] text-gray-400 font-semibold">{activeConfig.name} Corridor</div>
+          </div>
+          <ChevronLeft className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="absolute top-6 right-6 z-10 w-80 flex flex-col gap-4 max-h-[calc(100vh-48px)] overflow-y-auto">
+    <div className="absolute top-6 right-6 z-20 w-80 md:w-88 flex flex-col gap-3 max-h-[calc(100vh-48px)] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+      {/* Panel Top Header Bar */}
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-md border border-gray-200/80 p-3 px-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-xl bg-purple-50 text-purple-600">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-gray-900 tracking-tight">
+              GIS Layers &amp; Routing
+            </h3>
+            <p className="text-[10px] text-gray-400 font-semibold">
+              Coupled Hydraulic ML System
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsCollapsed(true)}
+          className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+          title="Collapse Panel"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* 1. Predictive Nowcast Horizon */}
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-blue-600" />
-            Predictive Nowcast
-          </h3>
-          <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+      <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border border-gray-200/70 p-4">
+        <div className="flex items-center justify-between mb-2.5">
+          <h4 className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 text-blue-600" />
+            <span>Predictive Lead Time</span>
+          </h4>
+          <span className="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
             {activeConfig.name}
           </span>
         </div>
-        <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="flex bg-gray-100/80 p-1 rounded-xl">
           {timeWindows.map((tw) => (
             <button
               key={tw}
               onClick={() => setTimeWindow(tw)}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 selectedTimeWindow === tw
-                  ? 'bg-white text-blue-700 shadow-sm font-bold'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white text-blue-700 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               {tw === '0h' ? 'Now' : `+${tw}`}
@@ -88,57 +137,57 @@ export default function RouteInspector() {
       </div>
 
       {/* 2. Hydraulic GIS Map Layers */}
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-5">
-        <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-purple-600" />
-            <span>Hydraulic GIS Layers</span>
-          </div>
-        </h3>
+      <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border border-gray-200/70 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+            <Route className="w-3.5 h-3.5 text-purple-600" />
+            <span>Active Hydraulic Overlays</span>
+          </h4>
+        </div>
 
         {/* Core Flood Nowcasting Layers */}
-        <div className="flex flex-col gap-2.5 pb-3 border-b border-gray-100">
-          <label className="flex items-center justify-between text-xs text-gray-700 cursor-pointer select-none">
+        <div className="space-y-2 pb-2.5 border-b border-gray-100 text-xs">
+          <label className="flex items-center justify-between p-2 rounded-xl bg-gray-50/70 hover:bg-gray-100/70 cursor-pointer select-none transition-colors">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={layerVisibility.streets}
                 onChange={() => toggleLayerVisibility('streets')}
-                className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
               />
-              <span className="font-bold">🌊 Street Inundation Depth</span>
+              <span className="font-bold text-gray-800">🌊 Street Inundation Depth</span>
             </div>
             <span className="text-[10px] text-gray-400 font-mono">0-3h Lead</span>
           </label>
 
-          <label className="flex items-center justify-between text-xs text-gray-700 cursor-pointer select-none">
+          <label className="flex items-center justify-between p-2 rounded-xl bg-gray-50/70 hover:bg-gray-100/70 cursor-pointer select-none transition-colors">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={layerVisibility.drainage}
                 onChange={() => toggleLayerVisibility('drainage')}
-                className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
               />
-              <span className="font-bold">🚰 Drainage Graph &amp; Surcharge</span>
+              <span className="font-bold text-gray-800">🚰 Drainage Flow &amp; Surcharge</span>
             </div>
-            <span className="text-[10px] text-gray-400 font-mono">1D Flow</span>
+            <span className="text-[10px] text-gray-400 font-mono">1D SWMM</span>
           </label>
 
-          <div className="flex items-center gap-2 pt-1 text-[10px] text-gray-500">
-            <Droplets className="w-3 h-3 text-blue-500" />
-            <span>DEM Micro-topography coupled to drains</span>
+          <div className="flex items-center gap-1.5 px-2 text-[10px] text-gray-500 font-medium">
+            <Droplets className="w-3 h-3 text-blue-500 shrink-0" />
+            <span>Coupled to micro-DEM topography &amp; high tide</span>
           </div>
         </div>
 
-        {/* Emergency Services & Flood Shelters */}
-        <div className="pt-2.5">
+        {/* Emergency Facilities Layer Filter */}
+        <div className="pt-0.5">
           <button
             onClick={() => setEmergencyLayersOpen(!emergencyLayersOpen)}
-            className="w-full flex items-center justify-between text-xs font-bold text-gray-600 hover:text-gray-900 cursor-pointer pb-1"
+            className="w-full flex items-center justify-between text-xs font-bold text-gray-700 hover:text-gray-900 cursor-pointer pb-1.5"
           >
             <span className="flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-blue-600" />
-              Flood Shelters &amp; Rescue Hubs
+              <span>Map Markers: Verified Help Hubs</span>
             </span>
             <ChevronDown
               className={`w-3.5 h-3.5 transform transition-transform ${
@@ -148,25 +197,25 @@ export default function RouteInspector() {
           </button>
 
           {emergencyLayersOpen && (
-            <div className="grid grid-cols-2 gap-2 mt-2 pt-1">
+            <div className="grid grid-cols-2 gap-1.5 mt-1">
               {[
                 { key: 'shelters' as ExtendedLayerKey, label: 'Evac Shelters', emoji: '🏠' },
                 { key: 'hospitals' as ExtendedLayerKey, label: 'Hospitals', emoji: '🏥' },
-                { key: 'police' as ExtendedLayerKey, label: 'Police', emoji: '👮' },
+                { key: 'police' as ExtendedLayerKey, label: 'Police Stations', emoji: '👮' },
                 { key: 'fire' as ExtendedLayerKey, label: 'Fire & Rescue', emoji: '🚒' },
               ].map((serv) => (
                 <label
                   key={serv.key}
-                  className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer select-none"
+                  className="flex items-center gap-1.5 text-xs text-gray-700 p-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer select-none transition-colors"
                 >
                   <input
                     type="checkbox"
                     checked={layerVisibility[serv.key]}
                     onChange={() => toggleLayerVisibility(serv.key)}
-                    className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
                   />
                   <span>{serv.emoji}</span>
-                  <span className="truncate font-medium">{serv.label}</span>
+                  <span className="truncate font-semibold text-[11px]">{serv.label}</span>
                 </label>
               ))}
             </div>
@@ -175,61 +224,63 @@ export default function RouteInspector() {
       </div>
 
       {/* 3. Flood-Safe Route Navigation */}
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-5">
-        <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Navigation className="w-4 h-4 text-green-600" />
-          Flood-Safe Navigation
-        </h3>
+      <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border border-gray-200/70 p-4 space-y-3">
+        <h4 className="text-xs font-black text-gray-900 flex items-center gap-1.5">
+          <Navigation className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Real-Time Evacuation Corridor</span>
+        </h4>
 
-        <div className="space-y-2.5 mb-4">
-          <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-            <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-700 font-bold truncate">
+        {/* Origin & Destination */}
+        <div className="space-y-1.5 text-xs">
+          <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+            <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span className="font-bold text-gray-800 truncate text-[11px]">
               {currentRouteInfo.start}
             </span>
           </div>
-          <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-            <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
-            <span className="text-xs text-gray-700 font-bold truncate">
+          <div className="flex items-center gap-2 bg-blue-50/60 p-2 rounded-xl border border-blue-100">
+            <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span className="font-bold text-blue-900 truncate text-[11px]">
               {currentRouteInfo.dest}
             </span>
           </div>
         </div>
 
-        <div className="space-y-2.5">
+        {/* Route Selectors */}
+        <div className="space-y-2 pt-1">
           <button
             onClick={() => setActiveRoute('primary')}
-            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-colors cursor-pointer ${
+            className={`w-full flex items-start gap-2.5 p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
               activeRoute === 'primary' || activeRoute === 'both'
-                ? 'border-red-200 bg-red-50/80 shadow-sm'
+                ? 'border-red-200 bg-red-50/80 shadow-xs'
                 : 'border-gray-100 hover:bg-gray-50'
             }`}
           >
-            <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <ShieldAlert className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
             <div>
               <div className="text-xs font-black text-gray-900">Primary Transit Route</div>
               <div className="text-[11px] text-red-700 font-semibold mt-0.5 leading-tight">
                 {currentRouteInfo.primaryMsg}
               </div>
-              <div className="text-[10px] text-gray-500 mt-1">2.5 km • +35 mins delay</div>
+              <div className="text-[10px] text-gray-500 mt-1 font-mono">2.5 km • +35 mins delay</div>
             </div>
           </button>
 
           <button
             onClick={() => setActiveRoute('alternate')}
-            className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-colors cursor-pointer ${
+            className={`w-full flex items-start gap-2.5 p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
               activeRoute === 'alternate' || activeRoute === 'both'
-                ? 'border-green-200 bg-green-50/80 shadow-sm'
+                ? 'border-emerald-200 bg-emerald-50/80 shadow-xs'
                 : 'border-gray-100 hover:bg-gray-50'
             }`}
           >
-            <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <div className="text-xs font-black text-gray-900">Flood-Safe Corridor</div>
-              <div className="text-[11px] text-green-700 font-semibold mt-0.5 leading-tight">
+              <div className="text-xs font-black text-gray-900">Flood-Safe Elevated Corridor</div>
+              <div className="text-[11px] text-emerald-700 font-semibold mt-0.5 leading-tight">
                 {currentRouteInfo.altMsg}
               </div>
-              <div className="text-[10px] text-gray-500 mt-1">3.2 km • 12 mins (Elevated Road)</div>
+              <div className="text-[10px] text-emerald-700 font-mono mt-1">3.2 km • 12 mins (Elevated Flyover)</div>
             </div>
           </button>
         </div>

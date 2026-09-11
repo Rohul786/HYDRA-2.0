@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFloodStore } from '@/store/useFloodStore';
 import { METRO_CONFIGS } from '@/data/metroFloodData';
 import { MetroCity, LeadTimeWindow, TidalState } from '@/types';
+import { Radio, Waves, Clock } from 'lucide-react';
 
 export default function MetroRadarBar() {
   const {
@@ -16,6 +17,25 @@ export default function MetroRadarBar() {
     selectedTimeWindow,
     setTimeWindow,
   } = useFloodStore();
+
+  const [currentTime, setCurrentTime] = useState<string>('');
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }) + ' IST'
+      );
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const activeConfig = METRO_CONFIGS[activeMetro];
 
@@ -30,9 +50,9 @@ export default function MetroRadarBar() {
   const currentDbz = calculateDbz(rainfallIntensity);
 
   return (
-    <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-3 max-w-4xl w-full flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
+    <div className="bg-slate-900/90 backdrop-blur-xl text-white rounded-3xl shadow-2xl border border-slate-700/60 p-3 max-w-5xl w-full flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 text-xs">
       {/* 1. Metro Basin Switcher */}
-      <div className="flex items-center gap-1.5 shrink-0 bg-gray-50/80 p-1 rounded-xl border border-gray-200/60">
+      <div className="flex items-center gap-1.5 shrink-0 bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/50">
         {(['mumbai', 'delhi', 'chennai'] as MetroCity[]).map((cityKey) => {
           const cfg = METRO_CONFIGS[cityKey];
           const isActive = activeMetro === cityKey;
@@ -40,10 +60,10 @@ export default function MetroRadarBar() {
             <button
               key={cityKey}
               onClick={() => setActiveMetro(cityKey)}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl font-black transition-all flex items-center gap-1.5 cursor-pointer ${
                 isActive
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700/60'
               }`}
             >
               <span>{cityKey === 'mumbai' ? '🌊' : cityKey === 'delhi' ? '🏛️' : '🌊'}</span>
@@ -56,23 +76,27 @@ export default function MetroRadarBar() {
       {/* 2. Doppler Radar Rainfall Slider & Intensity */}
       <div className="flex-1 flex flex-col justify-center px-2">
         <div className="flex items-center justify-between font-semibold mb-1">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-            <span className="text-gray-700 font-bold">Doppler Radar Nowcast:</span>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-blue-400 text-[11px] font-bold">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              Doppler Radar:
+            </span>
             <span
-              className={`px-1.5 py-0.5 rounded text-[11px] font-black ${
+              className={`px-2 py-0.5 rounded-md text-[11px] font-black font-mono ${
                 rainfallIntensity >= 60
-                  ? 'bg-red-100 text-red-700 border border-red-200'
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/40'
                   : rainfallIntensity >= 30
-                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
               }`}
             >
               {rainfallIntensity} mm/hr
             </span>
           </div>
-          <div className="text-[10px] text-gray-500 font-mono">
-            {currentDbz} dBZ • {activeConfig.radarStation.split(' ')[0]}
+          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+            <span>{currentDbz} dBZ</span>
+            <span>•</span>
+            <span className="text-slate-300 font-bold">{activeConfig.radarStation.split(' ')[0]} DWR</span>
           </div>
         </div>
 
@@ -84,27 +108,27 @@ export default function MetroRadarBar() {
             step={5}
             value={rainfallIntensity}
             onChange={(e) => setRainfallIntensity(Number(e.target.value))}
-            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setRainfallIntensity(80)}
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-              title="Extreme Cloudburst: 80 mm/hr"
+              className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/40 transition-colors cursor-pointer"
+              title="Cloudburst simulation (80 mm/hr)"
             >
               Cloudburst
             </button>
             <button
               onClick={() => setRainfallIntensity(45)}
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-              title="Heavy Monsoon: 45 mm/hr"
+              className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 transition-colors cursor-pointer"
+              title="Monsoonal Downpour (45 mm/hr)"
             >
               Heavy
             </button>
             <button
               onClick={() => setRainfallIntensity(0)}
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 hover:bg-gray-200"
-              title="Clear: 0 mm/hr"
+              className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title="Dry weather (0 mm/hr)"
             >
               Dry
             </button>
@@ -114,18 +138,21 @@ export default function MetroRadarBar() {
 
       {/* 3. Tidal State (for coastal basins) */}
       {(activeMetro === 'mumbai' || activeMetro === 'chennai') && (
-        <div className="flex items-center gap-1 shrink-0 bg-blue-50/50 p-1 rounded-xl border border-blue-100">
-          <span className="text-[10px] font-bold text-blue-900 px-1">Tide:</span>
+        <div className="flex items-center gap-1 shrink-0 bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/50">
+          <span className="text-[10px] font-bold text-slate-400 px-1 flex items-center gap-1">
+            <Waves className="w-3 h-3 text-cyan-400" />
+            Tide:
+          </span>
           {(['low_tide', 'normal', 'high_tide'] as TidalState[]).map((t) => (
             <button
               key={t}
               onClick={() => setTidalState(t)}
-              className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
                 tidalState === t
                   ? t === 'high_tide'
-                    ? 'bg-red-500 text-white shadow-sm'
-                    : 'bg-blue-600 text-white shadow-sm'
-                  : 'text-blue-700 hover:bg-blue-100/60'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               {t === 'high_tide' ? 'High Tide ⚠️' : t === 'low_tide' ? 'Low' : 'Normal'}
@@ -135,20 +162,26 @@ export default function MetroRadarBar() {
       )}
 
       {/* 4. Predictive Window Horizon */}
-      <div className="flex items-center gap-1 shrink-0 bg-gray-100/80 p-1 rounded-xl">
+      <div className="flex items-center gap-1 shrink-0 bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/50">
         {(['0h', '1h', '2h', '3h'] as LeadTimeWindow[]).map((windowKey) => (
           <button
             key={windowKey}
             onClick={() => setTimeWindow(windowKey)}
-            className={`px-2.5 py-1 rounded-lg font-black transition-all ${
+            className={`px-2.5 py-1 rounded-lg font-black transition-all cursor-pointer ${
               selectedTimeWindow === windowKey
-                ? 'bg-gray-900 text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700'
             }`}
           >
-            {windowKey}
+            {windowKey === '0h' ? 'NOW' : `+${windowKey}`}
           </button>
         ))}
+      </div>
+
+      {/* 5. Live Digital Clock & Radar Link Ticker */}
+      <div className="hidden xl:flex items-center gap-2 pl-2 border-l border-slate-800 text-[11px] font-mono text-slate-400 shrink-0">
+        <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+        <span className="font-bold text-slate-200">{currentTime || 'LIVE'}</span>
       </div>
     </div>
   );
