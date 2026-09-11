@@ -322,7 +322,32 @@ export const useFloodStore = create<FloodState>((set, get) => {
       const current = get().userLocation;
       if (current.latitude && current.longitude) {
         const muni = getNearestMunicipalAuthority(current.latitude, current.longitude);
-        set({ nearestMunicipality: muni });
+        const metroData = METRO_DATASETS[get().activeMetro];
+        if (metroData) {
+          const updatedServices = metroData.emergencyServices.map((s) => {
+            const dist = calculateHaversineDistance(current.latitude!, current.longitude!, s.latitude, s.longitude);
+            return {
+              ...s,
+              distanceMeters: dist,
+              distanceFormatted: formatDistance(dist),
+              travelTimeMins: calculateEstimatedTravelTime(dist, 'driving'),
+            };
+          });
+
+          set({
+            nearestMunicipality: muni,
+            nearbyServices: {
+              hospitals: updatedServices.filter((s) => s.type === 'hospital').sort((a, b) => a.distanceMeters - b.distanceMeters),
+              policeStations: updatedServices.filter((s) => s.type === 'police').sort((a, b) => a.distanceMeters - b.distanceMeters),
+              fireStations: updatedServices.filter((s) => s.type === 'fire_station').sort((a, b) => a.distanceMeters - b.distanceMeters),
+              shelters: updatedServices.filter((s) => s.type === 'shelter').sort((a, b) => a.distanceMeters - b.distanceMeters),
+              loading: false,
+              error: null,
+            },
+          });
+        } else {
+          set({ nearestMunicipality: muni });
+        }
       }
     },
 

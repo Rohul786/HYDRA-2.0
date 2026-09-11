@@ -27,7 +27,11 @@ export default function NearestMunicipalityCard() {
     acknowledgeMunicipalAlert,
     setMapCenterTarget,
     userLocation,
+    nearbyServices,
   } = useFloodStore();
+
+  const nearestPolice = nearbyServices?.policeStations?.[0] || null;
+  const nearestHospital = nearbyServices?.hospitals?.[0] || null;
 
   const [isDispatching, setIsDispatching] = useState(false);
   const [selectedChannels, setSelectedChannels] = useState<
@@ -210,7 +214,138 @@ export default function NearestMunicipalityCard() {
         )}
       </div>
 
-      {/* 3. SECTION: MUNICIPAL DISPATCH & PRE-ALERT WORKFLOW */}
+      {/* 3. SECTION: NEAREST EMERGENCY SERVICES (POLICE & HOSPITAL ACCORDING TO LOCATION) */}
+      <div className="space-y-2 pt-1 border-t border-gray-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">🚨</span>
+            <h4 className="font-black text-xs text-gray-900 tracking-tight uppercase">
+              Nearest Police Station &amp; Hospital
+            </h4>
+          </div>
+          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+            Location-Aware
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          {/* Nearest Police Station */}
+          {nearestPolice && (
+            <div className="bg-gradient-to-r from-blue-50/40 to-slate-50 p-2.5 rounded-2xl border border-blue-100 space-y-1.5">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="flex items-start gap-1.5 min-w-0">
+                  <span className="text-sm shrink-0">👮</span>
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-bold uppercase text-blue-700 block">
+                      Nearest Police Station
+                    </span>
+                    <h5 className="font-extrabold text-xs text-gray-900 truncate">
+                      {nearestPolice.name}
+                    </h5>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black text-blue-700 bg-white px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                  {nearestPolice.distanceFormatted}
+                  {nearestPolice.travelTimeMins ? ` • ~${nearestPolice.travelTimeMins}m` : ''}
+                </span>
+              </div>
+
+              {nearestPolice.address && (
+                <div className="text-[10px] text-gray-600 bg-white/80 p-1.5 rounded-xl border border-gray-100 line-clamp-1 font-medium">
+                  {nearestPolice.address}
+                </div>
+              )}
+
+              <div className="flex items-center gap-1 pt-0.5">
+                <button
+                  onClick={() => setMapCenterTarget([nearestPolice.latitude, nearestPolice.longitude])}
+                  className="flex-1 py-1 px-2 bg-white hover:bg-blue-50 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <MapPin className="w-2.5 h-2.5 text-blue-600" />
+                  <span>Map</span>
+                </button>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${nearestPolice.latitude},${nearestPolice.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-1 px-2 bg-white hover:bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1 text-center"
+                >
+                  <Navigation className="w-2.5 h-2.5 text-emerald-600" />
+                  <span>Directions</span>
+                </a>
+                {nearestPolice.phone && (
+                  <a
+                    href={`tel:${nearestPolice.phone.replace(/[^0-9+]/g, '')}`}
+                    className="py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Phone className="w-2.5 h-2.5" />
+                    <span>Call</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Nearest Hospital */}
+          {nearestHospital && (
+            <div className="bg-gradient-to-r from-red-50/40 to-slate-50 p-2.5 rounded-2xl border border-red-100 space-y-1.5">
+              <div className="flex items-start justify-between gap-1.5">
+                <div className="flex items-start gap-1.5 min-w-0">
+                  <span className="text-sm shrink-0">🏥</span>
+                  <div className="min-w-0">
+                    <span className="text-[9px] font-bold uppercase text-red-700 block">
+                      Nearest Hospital &amp; Emergency
+                    </span>
+                    <h5 className="font-extrabold text-xs text-gray-900 truncate">
+                      {nearestHospital.name}
+                    </h5>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black text-red-700 bg-white px-1.5 py-0.5 rounded border border-red-200 shrink-0">
+                  {nearestHospital.distanceFormatted}
+                  {nearestHospital.travelTimeMins ? ` • ~${nearestHospital.travelTimeMins}m` : ''}
+                </span>
+              </div>
+
+              {nearestHospital.address && (
+                <div className="text-[10px] text-gray-600 bg-white/80 p-1.5 rounded-xl border border-gray-100 line-clamp-1 font-medium">
+                  {nearestHospital.address}
+                </div>
+              )}
+
+              <div className="flex items-center gap-1 pt-0.5">
+                <button
+                  onClick={() => setMapCenterTarget([nearestHospital.latitude, nearestHospital.longitude])}
+                  className="flex-1 py-1 px-2 bg-white hover:bg-red-50 text-red-700 text-[10px] font-bold rounded-lg border border-red-200 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <MapPin className="w-2.5 h-2.5 text-red-600" />
+                  <span>Map</span>
+                </button>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${nearestHospital.latitude},${nearestHospital.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-1 px-2 bg-white hover:bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-1 text-center"
+                >
+                  <Navigation className="w-2.5 h-2.5 text-emerald-600" />
+                  <span>Directions</span>
+                </a>
+                {nearestHospital.phone && (
+                  <a
+                    href={`tel:${nearestHospital.phone.replace(/[^0-9+]/g, '')}`}
+                    className="py-1 px-2 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Phone className="w-2.5 h-2.5" />
+                    <span>Call</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4. SECTION: MUNICIPAL DISPATCH & PRE-ALERT WORKFLOW */}
       <div className="space-y-2 pt-1 border-t border-gray-100">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-gray-700">

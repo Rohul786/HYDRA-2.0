@@ -33,6 +33,7 @@ import LocationController from './LocationController';
 import ContinuousUpdateBanner from './ContinuousUpdateBanner';
 import ForecastReliabilityCard from './ForecastReliabilityCard';
 import UserProfileMenu from './UserProfileMenu';
+import NearestEmergencyCard from './NearestEmergencyCard';
 
 export default function LiveOperationsDock() {
   const {
@@ -296,6 +297,9 @@ export default function LiveOperationsDock() {
                     </div>
                   </div>
                 </div>
+
+                {/* Location-Aware Nearest Police Station & Hospital */}
+                <NearestEmergencyCard />
 
                 {/* 1. Probabilistic Rainfall Nowcast Card (30m, 60m, 120m) */}
                 <NowcastCard />
